@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="safe_deep">#070B1C</color>
+    <color name="safe_midnight">#0C1230</color>
+    <color name="safe_glass">#66FFFFFF</color>
+    <color name="safe_accent">#7C5CFF</color>
+    <color name="safe_accent2">#22D3EE</color>
+    <color name="ic_launcher_background">#0A0F24</color>
+</resources>

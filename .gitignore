@@ -1,0 +1,30 @@
+# --- Android / Gradle ---
+*.iml
+.gradle/
+.kotlin/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+output-metadata.json
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# --- Секреты и подпись ---
+*.jks
+*.keystore
+keystore.properties
+*.pepk
+.dev.vars
+.env
+
+# --- IDE / OS ---
+.idea/
+*.hprof
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Safe" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/safe_deep</item>
+    </style>
+
+    <style name="Theme.Safe.Splash" parent="Theme.Safe">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+    </style>
+</resources>
