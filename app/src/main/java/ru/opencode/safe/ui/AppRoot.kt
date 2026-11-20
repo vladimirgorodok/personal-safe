@@ -2,7 +2,9 @@ package ru.opencode.safe.ui
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -43,7 +45,9 @@ import ru.opencode.safe.ui.settings.AppearanceScreen
 import ru.opencode.safe.ui.settings.SettingsScreen
 import ru.opencode.safe.ui.splash.SplashScreen
 import ru.opencode.safe.ui.theme.LocalThemeSet
+import ru.opencode.safe.ui.theme.LocalUiOpacity
 import ru.opencode.safe.ui.theme.SafeTheme
+import ru.opencode.safe.ui.theme.UiOpacity
 import ru.opencode.safe.ui.theme.backgroundBrush
 import ru.opencode.safe.ui.theme.resolveDark
 import ru.opencode.safe.ui.vault.BrandDetailScreen
@@ -66,6 +70,12 @@ fun AppRoot() {
     var unlocked by remember { mutableStateOf(false) }
 
     val dark = resolveDark(state.display.darkMode)
+    val uiOpacity = UiOpacity(
+        card = state.display.cardOpacity,
+        background = state.display.backgroundOpacity,
+        border = state.display.borderOpacity,
+    )
+    val signatureSha1 = remember { appSignatureSha1(context) }
 
     LaunchedEffect(state.display.splashEnabled) {
         if (!state.display.splashEnabled && state.phase == Phase.SPLASH) viewModel.onSplashFinished()
@@ -77,8 +87,11 @@ fun AppRoot() {
         dynamicColor = state.display.dynamicColor,
     ) {
         val theme = LocalThemeSet.current
-        CompositionLocalProvider(LocalIconDir provides container.icons.directory.absolutePath) {
-            Box(modifier = Modifier.fillMaxSize().background(theme.backgroundBrush(dark))) {
+        CompositionLocalProvider(
+            LocalIconDir provides container.icons.directory.absolutePath,
+            LocalUiOpacity provides uiOpacity,
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(theme.backgroundBrush(dark, state.display.backgroundOpacity))) {
 
                 when (state.phase) {
                     Phase.SPLASH -> SplashScreen(onFinished = viewModel::onSplashFinished)
@@ -102,6 +115,7 @@ fun AppRoot() {
                                 imageSearchState = imageSearchState,
                                 nav = nav,
                                 viewModel = viewModel,
+                                signatureSha1 = signatureSha1,
                                 onBiometric = { enabled ->
                                     viewModel.setBiometric(enabled)
                                     if (enabled) unlocked = true
@@ -151,6 +165,7 @@ private fun ReadyContent(
     imageSearchState: ImageSearchState,
     nav: Navigator,
     viewModel: MainViewModel,
+    signatureSha1: String?,
     onBiometric: (Boolean) -> Unit,
     onOpenLink: (String) -> Unit,
     onPickedUri: (Uri) -> Unit,
@@ -247,17 +262,20 @@ private fun ReadyContent(
             )
 
             Screen.Appearance -> AppearanceScreen(
-                selectedThemeId = state.display.themeSetId,
-                darkMode = state.display.darkMode,
-                dynamicColor = state.display.dynamicColor,
-                glassEffects = state.display.glassEffects,
-                googleClientId = state.display.googleClientId,
+                display = state.display,
+                signatureSha1 = signatureSha1,
+                packageName = context.packageName,
                 onBack = { nav.pop() },
                 onTheme = viewModel::setThemeSet,
                 onDarkMode = viewModel::setDarkMode,
                 onDynamic = viewModel::setDynamicColor,
                 onGlass = viewModel::setGlassEffects,
                 onClientId = viewModel::setGoogleClientId,
+                onCardOpacity = viewModel::setCardOpacity,
+                onBackgroundOpacity = viewModel::setBackgroundOpacity,
+                onBorderOpacity = viewModel::setBorderOpacity,
+                onOpenLink = onOpenLink,
+                onCopy = onCopy,
             )
 
             Screen.AiSettings -> AiSettingsScreen(
@@ -314,6 +332,7 @@ private fun ReadyContent(
                     SecretDetailScreen(
                         secret = secret,
                         category = state.categories.firstOrNull { it.id == secret.categoryId },
+                        categories = state.categories,
                         onBack = { nav.pop() },
                         onSave = { viewModel.saveSecret(it); viewModel.showToast("Секрет сохранён") },
                         onDelete = { viewModel.deleteSecret(secret.id); nav.pop() },
@@ -329,3 +348,18 @@ private fun ReadyContent(
 
 private fun themeName(id: String): String =
     ru.opencode.safe.ui.theme.ThemeSets.all.firstOrNull { it.id == id }?.name ?: "Аврора"
+
+/** SHA-1 подписи приложения — его требуют при создании Android OAuth-клиента в Google Cloud. */
+private fun appSignatureSha1(context: android.content.Context): String? = runCatching {
+    val pm = context.packageManager
+    val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+        info.signingInfo?.apkContentsSigners
+    } else {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES).signatures
+    }
+    val bytes = signatures?.firstOrNull()?.toByteArray() ?: return null
+    java.security.MessageDigest.getInstance("SHA-1").digest(bytes)
+        .joinToString(":") { "%02X".format(it) }
+}.getOrNull()

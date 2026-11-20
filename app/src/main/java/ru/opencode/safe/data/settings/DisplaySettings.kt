@@ -7,6 +7,12 @@ data class DisplaySettings(
     val darkMode: DarkMode = DarkMode.DARK,
     val dynamicColor: Boolean = false,
     val glassEffects: Boolean = true,
+    /** 1f — как задумано темой, 0f — полностью прозрачные карточки. */
+    val cardOpacity: Float = 1f,
+    /** Насыщенность фонового градиента: 1f — полная, 0f — только базовый цвет. */
+    val backgroundOpacity: Float = 1f,
+    /** Прозрачность рамок и разделителей. */
+    val borderOpacity: Float = 1f,
     val splashEnabled: Boolean = true,
     val aiSuggestCategory: Boolean = true,
     val googleClientId: String = "",

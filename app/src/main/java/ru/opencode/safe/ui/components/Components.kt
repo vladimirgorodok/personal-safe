@@ -41,8 +41,10 @@ import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -69,6 +72,7 @@ import kotlinx.coroutines.withContext
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
 import ru.opencode.safe.data.model.SecretLink
+import ru.opencode.safe.ui.theme.LocalUiOpacity
 import java.io.File
 import kotlin.math.abs
 
@@ -118,11 +122,9 @@ fun GlassCard(
     content: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(24.dp)
-    val base = if (MaterialTheme.colorScheme.background.luminanceIsDark()) {
-        Color.White.copy(alpha = 0.06f)
-    } else {
-        Color.White.copy(alpha = 0.75f)
-    }
+    val opacity = LocalUiOpacity.current
+    val baseAlpha = if (MaterialTheme.colorScheme.background.luminanceIsDark()) 0.06f else 0.75f
+    val base = Color.White.copy(alpha = (baseAlpha * opacity.card).coerceIn(0f, 1f))
     Surface(
         modifier = modifier
             .clip(shape)
@@ -134,9 +136,14 @@ fun GlassCard(
 }
 
 @Composable
-fun SafeGlassStrokeColor(): Color =
-    if (MaterialTheme.colorScheme.background.luminanceIsDark()) Color.White.copy(alpha = 0.14f)
-    else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+fun SafeGlassStrokeColor(): Color {
+    val opacity = LocalUiOpacity.current
+    return if (MaterialTheme.colorScheme.background.luminanceIsDark()) {
+        Color.White.copy(alpha = (0.14f * opacity.border).coerceIn(0f, 1f))
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = (0.10f * opacity.border).coerceIn(0f, 1f))
+    }
+}
 
 private fun Color.luminanceIsDark(): Boolean = (red * 0.299f + green * 0.587f + blue * 0.114f) < 0.5f
 
@@ -227,37 +234,53 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Значение секрета. По умолчанию скрыто маской и только для чтения.
+ * Кнопка глаза открывает значение и делает поле редактируемым.
+ */
 @Composable
-fun MaskedValue(
+fun SecretValueField(
     value: String,
-    onCopy: (() -> Unit)? = null,
+    revealed: Boolean,
+    onRevealedChange: (Boolean) -> Unit,
+    onChange: (String) -> Unit,
+    onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var revealed by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = if (revealed) value else mask(value),
-            style = MaterialTheme.typography.bodyLarge,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = { revealed = !revealed }) {
-            Icon(if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, "Показать")
-        }
-        if (onCopy != null) {
-            IconButton(onClick = onCopy) { Icon(Icons.Rounded.ContentCopy, "Копировать") }
-        }
-    }
+    OutlinedTextField(
+        value = if (revealed) value else mask(value),
+        onValueChange = { if (revealed) onChange(it) },
+        readOnly = !revealed,
+        label = { Text("Значение") },
+        placeholder = { Text("Секрет пуст") },
+        supportingText = {
+            Text(
+                if (revealed) "Значение открыто — можно изменить" else "Скрыто. Нажмите на глаз, чтобы показать и изменить",
+                style = MaterialTheme.typography.labelSmall,
+            )
+        },
+        trailingIcon = {
+            Row {
+                IconButton(onClick = { onRevealedChange(!revealed) }) {
+                    Icon(
+                        if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                        if (revealed) "Скрыть" else "Показать и изменить",
+                    )
+                }
+                IconButton(onClick = onCopy) { Icon(Icons.Rounded.ContentCopy, "Копировать") }
+            }
+        },
+        minLines = 2,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+        shape = RoundedCornerShape(16.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+            focusedIndicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+        modifier = modifier.fillMaxWidth(),
+    )
 }
 
 fun mask(value: String): String {

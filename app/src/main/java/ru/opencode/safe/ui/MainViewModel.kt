@@ -173,6 +173,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setDarkMode(mode: DarkMode) = scope { container.settings.setDarkMode(mode) }
     fun setDynamicColor(value: Boolean) = scope { container.settings.setDynamicColor(value) }
     fun setGlassEffects(value: Boolean) = scope { container.settings.setGlassEffects(value) }
+    fun setCardOpacity(value: Float) = scope { container.settings.setCardOpacity(value) }
+    fun setBackgroundOpacity(value: Float) = scope { container.settings.setBackgroundOpacity(value) }
+    fun setBorderOpacity(value: Float) = scope { container.settings.setBorderOpacity(value) }
     fun setSplashEnabled(value: Boolean) = scope { container.settings.setSplashEnabled(value) }
     fun setAiSuggest(value: Boolean) = scope { container.settings.setAiSuggest(value) }
     fun setGoogleClientId(value: String) = scope { container.settings.setGoogleClientId(value) }

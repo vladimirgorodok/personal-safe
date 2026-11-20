@@ -10,10 +10,20 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import ru.opencode.safe.data.settings.DarkMode
 
 val LocalThemeSet = staticCompositionLocalOf { ThemeSets.dark("aurora") }
+
+/** Прозрачность элементов интерфейса, которую пользователь крутит в настройках. */
+data class UiOpacity(
+    val card: Float = 1f,
+    val background: Float = 1f,
+    val border: Float = 1f,
+)
+
+val LocalUiOpacity = staticCompositionLocalOf { UiOpacity() }
 
 fun isDarkNow(mode: DarkMode): Boolean = when (mode) {
     DarkMode.SYSTEM -> false
@@ -48,20 +58,28 @@ fun SafeTheme(
     }
 }
 
-/** Фоновый градиент текущей темы (для заголовков, заставки, карточек). */
-fun ThemeSet.backgroundBrush(dark: Boolean): Brush {
+/**
+ * Фоновый градиент текущей темы (для заголовков, заставки, карточек).
+ *
+ * Все цвета накладываются поверх непрозрачного базового цвета: иначе сквозь
+ * полупрозрачный фон просвечивало бы окно (заставка с логотипом), и значок
+ * казался бы нарисованным поверх карточек.
+ */
+fun ThemeSet.backgroundBrush(dark: Boolean, accentOpacity: Float = 1f): Brush {
     val base = scheme.background
+    fun accent(color: Color?, alpha: Float): Color =
+        (color ?: base).copy(alpha = (alpha * accentOpacity).coerceIn(0f, 1f)).compositeOver(base)
     return if (dark) {
         Brush.linearGradient(
             listOf(
                 base,
-                gradient.getOrNull(0)?.copy(alpha = 0.18f) ?: base,
-                gradient.lastOrNull()?.copy(alpha = 0.24f) ?: base,
+                accent(gradient.getOrNull(0), 0.18f),
+                accent(gradient.lastOrNull(), 0.24f),
                 base,
             )
         )
     } else {
-        Brush.linearGradient(listOf(base, gradient.getOrNull(0)?.copy(alpha = 0.10f) ?: base, base))
+        Brush.linearGradient(listOf(base, accent(gradient.getOrNull(0), 0.10f), base))
     }
 }
 
