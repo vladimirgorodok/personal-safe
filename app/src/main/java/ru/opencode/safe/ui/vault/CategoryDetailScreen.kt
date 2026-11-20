@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.Secret
+import ru.opencode.safe.ui.components.Appear
 import ru.opencode.safe.ui.components.CategoryAvatar
 import ru.opencode.safe.ui.components.EmptyState
 import ru.opencode.safe.ui.components.GlassCard
@@ -119,26 +120,28 @@ fun CategoryDetailScreen(
                     )
                 }
             } else {
-                items(secrets, key = { it.id }) { secret ->
-                    GlassCard(modifier = Modifier.fillMaxWidth(), onClick = { onOpenSecret(secret.id) }) {
-                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center,
-                            ) { Icon(Icons.Rounded.VpnKey, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(secret.title.ifBlank { "Без названия" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Spacer(Modifier.height(2.dp))
-                                Text(mask(secret.value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            IconButton(onClick = { onToggleFavorite(secret.id) }) {
-                                Icon(
-                                    if (secret.isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                                    "Избранное",
-                                    tint = if (secret.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                itemsIndexed(secrets, key = { _, secret -> secret.id }) { index, secret ->
+                    Appear(index = index) {
+                        GlassCard(modifier = Modifier.fillMaxWidth(), onClick = { onOpenSecret(secret.id) }) {
+                            Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                                    contentAlignment = Alignment.Center,
+                                ) { Icon(Icons.Rounded.VpnKey, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) }
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(secret.title.ifBlank { "Без названия" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(mask(secret.value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                IconButton(onClick = { onToggleFavorite(secret.id) }) {
+                                    Icon(
+                                        if (secret.isFavorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                        "Избранное",
+                                        tint = if (secret.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
