@@ -11,7 +11,9 @@ import androidx.compose.material.icons.rounded.ImageNotSupported
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -36,16 +38,17 @@ private val httpClient: OkHttpClient by lazy {
 /** Загружает удалённое изображение с кэшем в памяти. */
 @Composable
 fun rememberRemoteBitmap(url: String?): ImageBitmap? {
-    return produceState<ImageBitmap?>(initialValue = url?.let { memoryCache.get(it) }, url) {
+    val state = remember(url) { mutableStateOf(url?.let { memoryCache.get(it) }) }
+    LaunchedEffect(url) {
         if (url.isNullOrBlank()) {
-            value = null
-            return@produceState
+            state.value = null
+            return@LaunchedEffect
         }
         memoryCache.get(url)?.let {
-            value = it
-            return@produceState
+            state.value = it
+            return@LaunchedEffect
         }
-        value = withContext(Dispatchers.IO) {
+        state.value = withContext(Dispatchers.IO) {
             runCatching {
                 val request = Request.Builder()
                     .url(url)
@@ -60,7 +63,8 @@ fun rememberRemoteBitmap(url: String?): ImageBitmap? {
                 ?.let { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
                 ?.also { memoryCache.put(url, it) }
         }
-    }.value
+    }
+    return state.value
 }
 
 @Composable

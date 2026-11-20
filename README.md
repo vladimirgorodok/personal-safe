@@ -33,6 +33,16 @@
   стеклянные эффекты.
 - **Заставка** — 5-секундная анимация со стеклянным щитом, сиянием, частицами и прогрессом.
 
+## Что нового в 1.2
+
+- **Исправлен краш при запуске.** `splash_window.xml` использовал тег `<bitmap>` с векторной
+  иконкой; `BitmapDrawable` не умеет разворачивать вектор и падал с
+  `Resources$NotFoundException: Drawable drawable/splash_window`. Теперь логотип подключён
+  как обычный слой `layer-list` (`<item android:drawable=...>`).
+- **Lint проходит без ошибок.** `rememberFileBitmap` и `rememberRemoteBitmap` переписаны
+  с `produceState` на `mutableStateOf` + `LaunchedEffect` (детектор
+  `ProduceStateDoesNotAssignValue` валил `lintRelease`).
+
 ## Офлайн-режим
 
 Без настроенного ИИ работает локальная эвристика: тип секрета определяется по формату
@@ -63,7 +73,7 @@ export SAFE_KEY_PASSWORD=...
 
 Без этих переменных релиз соберётся, но останется неподписанным.
 
-Готовый APK: `../Safe-v1.1.apk`.
+Готовый APK: `../Safe-v1.2.apk`.
 
 ## Структура
 

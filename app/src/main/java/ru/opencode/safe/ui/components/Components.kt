@@ -44,9 +44,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -99,14 +99,16 @@ fun seedBrush(seed: Long): Brush {
 
 @Composable
 fun rememberFileBitmap(path: String?): ImageBitmap? {
-    return produceState<ImageBitmap?>(initialValue = null, path) {
-        value = withContext(Dispatchers.IO) {
+    val bitmap = remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bitmap.value = withContext(Dispatchers.IO) {
             path?.let { p ->
                 val f = File(p)
                 if (f.exists()) BitmapFactory.decodeFile(p)?.asImageBitmap() else null
             }
         }
-    }.value
+    }
+    return bitmap.value
 }
 
 @Composable

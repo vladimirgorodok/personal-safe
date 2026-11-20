@@ -10,7 +10,14 @@
                 android:type="linear" />
         </shape>
     </item>
-    <item android:gravity="center">
-        <bitmap android:src="@drawable/ic_launcher_foreground" android:gravity="center" />
-    </item>
+    <!--
+        Логотип — векторная иконка. Тег <bitmap> принимает только растр
+        (иначе BitmapDrawable падает с "requires a valid 'src' attribute"),
+        поэтому подключаем вектор как обычный слой.
+    -->
+    <item
+        android:drawable="@drawable/ic_logo"
+        android:gravity="center"
+        android:width="128dp"
+        android:height="128dp" />
 </layer-list>
