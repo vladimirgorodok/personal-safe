@@ -18,12 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -128,38 +127,52 @@ fun AppearanceScreen(
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Чтобы включить настоящий вход через Google, создайте OAuth Client ID типа «Веб-приложение» и вставьте его ниже. Без него работает демо-профиль.",
+                            "Вход через Google включается двумя записями в Google Cloud Console. Имя пакета и SHA-1 подписи нужны для Android-записи (по ним Google проверяет, что запрос идёт из вашего приложения), а Client ID вы копируете из веб-записи.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(Modifier.height(14.dp))
-                        Text("Инструкция", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+
+                        Spacer(Modifier.height(16.dp))
+                        StepHeader("Шаг 1", "Android-клиент — сюда вставляются имя пакета и SHA-1")
+                        InstructionStep(1, "Слева вверху нажмите «+ Create credentials» → «OAuth client ID».")
+                        InstructionStep(2, "В поле «Application type» выберите «Android».")
+                        InstructionStep(3, "Заполните два поля формы значениями ниже — они называются точно так же.")
                         Spacer(Modifier.height(6.dp))
-                        InstructionStep(1, "Откройте Google Cloud Console → «APIs & Services» → «Credentials».")
-                        InstructionStep(2, "Создайте «Create credentials» → «OAuth client ID» → тип «Web application».")
-                        InstructionStep(3, "В поле «Authorized redirect URIs» добавьте адрес приложения, если он нужен вашему клиенту.")
-                        InstructionStep(4, "Скопируйте полученный Client ID (вида 1234-abc.apps.googleusercontent.com) и вставьте ниже.")
-                        Spacer(Modifier.height(12.dp))
+                        CopyInfoRow(
+                            label = "Имя пакета",
+                            target = "вставьте в поле «Package name»",
+                            value = packageName,
+                            onCopy = onCopy,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        CopyInfoRow(
+                            label = "SHA-1 подписи",
+                            target = "вставьте в поле «SHA-1 certificate fingerprint»",
+                            value = signatureSha1 ?: "недоступно",
+                            onCopy = onCopy,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        InstructionStep(4, "Нажмите «Create». Client ID этой записи приложению не нужен — ничего не копируйте.")
+
+                        Spacer(Modifier.height(16.dp))
+                        StepHeader("Шаг 2", "Веб-клиент — из него берётся Client ID для приложения")
+                        InstructionStep(1, "Снова «+ Create credentials» → «OAuth client ID».")
+                        InstructionStep(2, "В поле «Application type» выберите «Web application» и нажмите «Create».")
+                        InstructionStep(3, "В списке записей нажмите на созданную веб-запись и скопируйте её «Client ID» (вида 1234567890-abc.apps.googleusercontent.com).")
+                        InstructionStep(4, "Вставьте его в поле ниже — он применится при следующем входе.")
+
+                        Spacer(Modifier.height(14.dp))
                         OutlinedButton(
                             onClick = { onOpenLink(GOOGLE_CREDENTIALS_URL) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                         ) {
-                            Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text("Открыть Google Cloud Console")
                         }
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            "Эти данные нужны, чтобы добавить Android-клиент:",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        CopyInfoRow("Имя пакета", packageName, onCopy)
-                        Spacer(Modifier.height(6.dp))
-                        CopyInfoRow("SHA-1 подписи", signatureSha1 ?: "недоступно", onCopy)
-                        Spacer(Modifier.height(14.dp))
+
+                        Spacer(Modifier.height(16.dp))
                         OutlinedTextField(
                             value = clientId,
                             onValueChange = { clientId = it; onClientId(it) },
@@ -173,6 +186,12 @@ fun AppearanceScreen(
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
                             ),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "SHA-1 показан для установленной сборки. Если поставите другую сборку (например, debug), подпись будет другой — возьмите SHA-1 из неё.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -229,26 +248,63 @@ private fun InstructionStep(number: Int, text: String) {
 }
 
 @Composable
-private fun CopyInfoRow(label: String, value: String, onCopy: (String) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-            .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun StepHeader(step: String, title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        ) {
             Text(
-                value,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                maxLines = 1,
+                step,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
             )
         }
-        IconButton(onClick = { onCopy(value) }) {
-            Icon(Icons.Rounded.ContentCopy, "Скопировать", modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun CopyInfoRow(
+    label: String,
+    target: String,
+    value: String,
+    onCopy: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+            .padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    target,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = { onCopy(value) }) { Text("Копировать") }
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
