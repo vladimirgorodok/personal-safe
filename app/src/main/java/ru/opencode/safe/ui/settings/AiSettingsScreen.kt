@@ -1,5 +1,7 @@
 package ru.opencode.safe.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -41,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -258,26 +262,90 @@ fun AiSettingsScreen(
     }
 
     models?.let { list ->
-        AlertDialog(
-            onDismissRequest = { models = null },
-            title = { Text("Модели провайдера") },
-            text = {
-                if (list.isEmpty()) Text("Список пуст")
-                else LazyColumn(modifier = Modifier.heightIn(max = 380.dp)) {
-                    items(list.size) { index ->
-                        val id = list[index]
-                        Text(
-                            id,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (index == 0) Spacer(Modifier.height(1.dp))
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { models = null }) { Text("Закрыть") } },
+        ModelPickerDialog(
+            models = list,
+            selected = model,
+            onPick = { id -> model = id; models = null },
+            onDismiss = { models = null },
         )
     }
+}
+
+/**
+ * Выбор модели из списка провайдера. Список бывает длинным, поэтому есть поиск,
+ * а строки выбираются нажатием (текущая модель помечена галочкой).
+ */
+@Composable
+private fun ModelPickerDialog(
+    models: List<String>,
+    selected: String,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(models, query) {
+        if (query.isBlank()) models else models.filter { it.contains(query.trim(), ignoreCase = true) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Модели провайдера") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Поиск модели") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = fieldColors(),
+                )
+                Spacer(Modifier.height(8.dp))
+                if (filtered.isEmpty()) {
+                    Text(
+                        if (models.isEmpty()) "Список пуст" else "Ничего не найдено",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(filtered.size) { index ->
+                            val id = filtered[index]
+                            val isSelected = id.equals(selected, ignoreCase = true)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onPick(id) }
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        else Color.Transparent
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    id,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Rounded.Check,
+                                        "Выбрано",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
+    )
 }
 
 @Composable
