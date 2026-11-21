@@ -334,8 +334,10 @@ private fun ReadyContent(
             Screen.Backup -> BackupScreen(
                 state = backupState,
                 accountEmail = state.profile?.email,
+                autoBackup = state.display.autoBackup,
                 activity = activity,
                 onBack = { nav.pop() },
+                onAutoBackup = viewModel::setAutoBackup,
                 onRefresh = viewModel::refreshDriveBackup,
                 onBackup = viewModel::createBackup,
                 onRestore = viewModel::restoreBackup,

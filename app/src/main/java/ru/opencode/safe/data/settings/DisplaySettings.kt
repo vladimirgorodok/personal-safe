@@ -19,5 +19,7 @@ data class DisplaySettings(
     val biometricLock: Boolean = false,
     /** Не спрашивать Google-аккаунт при каждом запуске — входить в сохранённый профиль. */
     val rememberSignIn: Boolean = true,
+    /** Сама сохранять копию в Google Drive после каждого изменения. */
+    val autoBackup: Boolean = true,
     val onboarded: Boolean = false,
 )

@@ -17,30 +17,41 @@ data class DriveFile(val id: String, val name: String, val modifiedTime: String?
  */
 class DriveBackupClient(private val http: OkHttpClient) {
 
-    fun findBackup(token: String): DriveFile? {
+    fun findBackup(token: String): DriveFile? = find(token, FILE_NAME)
+
+    /** Ключ шифрования автоматической копии — лежит рядом с копией, отдельным файлом. */
+    fun findKey(token: String): DriveFile? = find(token, KEY_NAME)
+
+    fun find(token: String, name: String): DriveFile? {
         val json = JSONObject(get(token, listUrl()))
         val files = json.optJSONArray("files") ?: JSONArray()
-        // Копий с этим именем быть не должно больше одной, но если есть — берём свежую.
+        // Файла с этим именем быть не должно больше одного, но если есть — берём свежий.
         // Время в формате RFC 3339, поэтому сравниваем как строки и не просим сортировку у Google.
         return (0 until files.length())
             .mapNotNull { files.optJSONObject(it) }
             .map { toFile(it) }
-            .filter { it.name == FILE_NAME }
+            .filter { it.name == name }
             .maxByOrNull { it.modifiedTime ?: "" }
     }
 
-    fun upload(token: String, bytes: ByteArray, existingId: String?): DriveFile {
+    fun uploadBackup(token: String, bytes: ByteArray, existingId: String?): DriveFile =
+        upload(token, FILE_NAME, bytes, existingId)
+
+    fun uploadKey(token: String, bytes: ByteArray, existingId: String?): DriveFile =
+        upload(token, KEY_NAME, bytes, existingId)
+
+    fun upload(token: String, name: String, bytes: ByteArray, existingId: String?): DriveFile {
         val media = bytes.toRequestBody(OCTET_STREAM)
         return if (existingId == null) {
             val metadata = JSONObject()
-                .put("name", FILE_NAME)
+                .put("name", name)
                 .put("parents", JSONArray().put("appDataFolder"))
                 .toString()
                 .toRequestBody(JSON)
             val multipart = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("metadata", null, metadata)
-                .addFormDataPart("file", FILE_NAME, media)
+                .addFormDataPart("file", name, media)
                 .build()
             val request = Request.Builder()
                 .url("$UPLOAD?uploadType=multipart&fields=id,name,modifiedTime")
@@ -98,6 +109,9 @@ class DriveBackupClient(private val http: OkHttpClient) {
 
     companion object {
         const val FILE_NAME = "personal-safe-backup.bin"
+
+        /** Ключ шифрования автоматической копии. Лежит в той же скрытой папке приложения. */
+        const val KEY_NAME = "personal-safe-backup.key"
 
         /**
          * Список файлов в скрытой папке приложения. В Drive API v3 она называется

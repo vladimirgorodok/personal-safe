@@ -26,6 +26,7 @@ class SettingsRepository(private val context: Context) {
         val CLIENT_ID = stringPreferencesKey("google_client_id")
         val BIOMETRIC = booleanPreferencesKey("biometric_lock")
         val REMEMBER_SIGN_IN = booleanPreferencesKey("remember_sign_in")
+        val AUTO_BACKUP = booleanPreferencesKey("auto_backup")
         val ONBOARDED = booleanPreferencesKey("onboarded")
     }
 
@@ -43,6 +44,7 @@ class SettingsRepository(private val context: Context) {
             googleClientId = p[Keys.CLIENT_ID] ?: "",
             biometricLock = p[Keys.BIOMETRIC] ?: false,
             rememberSignIn = p[Keys.REMEMBER_SIGN_IN] ?: true,
+            autoBackup = p[Keys.AUTO_BACKUP] ?: true,
             onboarded = p[Keys.ONBOARDED] ?: false,
         )
     }
@@ -59,5 +61,6 @@ class SettingsRepository(private val context: Context) {
     suspend fun setGoogleClientId(value: String) = context.settingsDataStore.edit { it[Keys.CLIENT_ID] = value }
     suspend fun setBiometric(value: Boolean) = context.settingsDataStore.edit { it[Keys.BIOMETRIC] = value }
     suspend fun setRememberSignIn(value: Boolean) = context.settingsDataStore.edit { it[Keys.REMEMBER_SIGN_IN] = value }
+    suspend fun setAutoBackup(value: Boolean) = context.settingsDataStore.edit { it[Keys.AUTO_BACKUP] = value }
     suspend fun setOnboarded(value: Boolean) = context.settingsDataStore.edit { it[Keys.ONBOARDED] = value }
 }

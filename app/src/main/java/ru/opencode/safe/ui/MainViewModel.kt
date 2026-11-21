@@ -10,6 +10,8 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,7 @@ import ru.opencode.safe.data.ai.AgentSource
 import ru.opencode.safe.data.ai.BrandCatalog
 import ru.opencode.safe.data.ai.Heuristics
 import ru.opencode.safe.data.backup.BackupCrypto
+import ru.opencode.safe.data.backup.BackupSafety
 import ru.opencode.safe.data.backup.DriveBackupClient
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
@@ -40,6 +43,9 @@ import ru.opencode.safe.ui.drive.DriveAuth
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.crypto.AEADBadTagException
+
+/** Задержка перед автоматической копией: ждём, пока пользователь закончит правку. */
+private const val AUTO_BACKUP_DELAY_MS = 8_000L
 
 enum class Phase { SPLASH, AUTH, READY }
 
@@ -85,6 +91,12 @@ data class BackupState(
     val error: String? = null,
     val hasRemote: Boolean = false,
     val remoteModified: String? = null,
+    /** Доступ к Drive получен — автоматическая копия после изменений работает. */
+    val autoActive: Boolean = false,
+    /** Время последней автоматической копии. */
+    val autoSavedAt: String? = null,
+    /** Копия сделана старой версией (с фразой) — для восстановления нужна фраза. */
+    val phraseRequired: Boolean = false,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -106,6 +118,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val backup: StateFlow<BackupState> = _backup.asStateFlow()
 
     private val drive = DriveBackupClient(container.http)
+
+    /** Ключ шифрования копии, полученный из Google Drive в этой сессии. */
+    private var driveKey: ByteArray? = null
+
+    /** Проверяли ли уже в этой сессии, что удалённую копию не затрём. */
+    private var guardChecked = false
+
+    /** Пробовали ли уже получить доступ к Drive без окон. */
+    private var drivePrimed = false
+
+    private var autoBackupJob: Job? = null
 
     private val brandIconRequests = mutableSetOf<String>()
 
@@ -139,6 +162,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun persist() {
         val snapshot = data
         viewModelScope.launch(Dispatchers.IO) { container.vault.save(snapshot) }
+        scheduleAutoBackup()
     }
 
     private fun publish() {
@@ -169,6 +193,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!s.splashDone || !s.vaultLoaded || !s.settingsLoaded) return
         val next = SessionPolicy.startPhase(s.profile != null, s.display.rememberSignIn)
         if (s.phase != next) _state.update { it.copy(phase = next) }
+        if (next == Phase.READY) primeDrive()
+    }
+
+    /**
+     * Один раз за сессию тихо проверяем доступ к Drive. Если разрешение уже выдано, это
+     * происходит без единого окна — и дальше автоматическая копия работает сама.
+     */
+    private fun primeDrive() {
+        if (drivePrimed) return
+        val profile = data.profile ?: return
+        if (profile.isDemo) return
+        drivePrimed = true
+        viewModelScope.launch {
+            val token = driveToken()
+            _backup.update { it.copy(autoActive = token != null) }
+        }
     }
 
     fun signInDemo() {
@@ -204,6 +244,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     publish()
                     // Аккаунт мог смениться — старый токен Drive больше не подходит.
                     DriveAuth.forget()
+                    drivePrimed = false
+                    primeDrive()
                     _state.update {
                         it.copy(
                             phase = Phase.READY,
@@ -228,6 +270,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         persist()
         publish()
         DriveAuth.forget()
+        autoBackupJob?.cancel()
+        driveKey = null
+        guardChecked = false
+        drivePrimed = false
+        _backup.value = BackupState()
         _state.update { it.copy(phase = Phase.AUTH) }
     }
 
@@ -249,6 +296,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setGoogleClientId(value: String) = scope { container.settings.setGoogleClientId(value) }
     fun setBiometric(value: Boolean) = scope { container.settings.setBiometric(value) }
     fun setRememberSignIn(value: Boolean) = scope { container.settings.setRememberSignIn(value) }
+
+    /** Автоматическая копия после изменений: включить или выключить. */
+    fun setAutoBackup(value: Boolean) = scope {
+        container.settings.setAutoBackup(value)
+        if (value) {
+            drivePrimed = false
+            primeDrive()
+        } else {
+            autoBackupJob?.cancel()
+            _backup.update { it.copy(autoActive = false, autoSavedAt = null) }
+        }
+    }
 
     private fun scope(block: suspend () -> Unit) {
         viewModelScope.launch { block() }
@@ -654,10 +713,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshDriveBackup(token: String) {
         _backup.update { it.copy(running = true, error = null, message = null) }
         viewModelScope.launch {
-            runCatching { drive.findBackup(token) }
+            runCatching { withContext(Dispatchers.IO) { drive.findBackup(token) } }
                 .onSuccess { file ->
                     _backup.update {
-                        it.copy(running = false, hasRemote = file != null, remoteModified = file?.modifiedTime)
+                        it.copy(
+                            running = false,
+                            hasRemote = file != null,
+                            remoteModified = file?.modifiedTime,
+                            phraseRequired = false,
+                        )
                     }
                 }
                 .onFailure { e ->
@@ -666,31 +730,135 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Шифрует сейф фразой и заливает в скрытую папку приложения на Google Диске. */
-    fun createBackup(token: String, passphrase: String) {
-        if (passphrase.length < BackupCrypto.MIN_PASSPHRASE) {
-            _backup.update {
-                it.copy(error = "Фраза слишком короткая: нужно минимум ${BackupCrypto.MIN_PASSPHRASE} символов")
-            }
+    // ---------------- Автоматическая копия: ключ лежит рядом с копией в Drive ----------------
+
+    /**
+     * Тихо получает доступ к Google Drive, если разрешение уже выдано. Окна согласия здесь
+     * не показываем — их вызывают только кнопки на экране резервной копии.
+     */
+    private suspend fun driveToken(): String? {
+        DriveAuth.cachedToken()?.let { return it }
+        val profile = data.profile ?: return null
+        if (profile.isDemo) return null
+        return DriveAuth.silentToken(getApplication(), profile.email)
+    }
+
+    /** Ключ шифрования копии: отдельный файл в скрытой папке приложения, рядом с копией. */
+    private suspend fun driveKey(token: String): ByteArray {
+        driveKey?.let { return it }
+        val existing = drive.findKey(token)
+        val stored = existing?.let { runCatching { drive.download(token, it.id) }.getOrNull() }
+        if (stored != null && stored.size == BackupCrypto.KEY_LEN) {
+            driveKey = stored
+            return stored
+        }
+        val created = BackupCrypto.newKey()
+        drive.uploadKey(token, created, existing?.id)
+        driveKey = created
+        return created
+    }
+
+    /** Копия после каждого изменения. Небольшая задержка — чтобы не отправлять файл на каждое нажатие. */
+    private fun scheduleAutoBackup() {
+        if (!_state.value.display.autoBackup) return
+        val profile = data.profile ?: return
+        if (profile.isDemo) return
+        if (data.secrets.isEmpty()) return
+        autoBackupJob?.cancel()
+        autoBackupJob = viewModelScope.launch {
+            delay(AUTO_BACKUP_DELAY_MS)
+            autoBackupNow()
+        }
+    }
+
+    private suspend fun autoBackupNow() {
+        val token = driveToken() ?: run {
+            _backup.update { it.copy(autoActive = false) }
             return
         }
+        _backup.update { it.copy(autoActive = true) }
+        val snapshot = data
+        val payload = snapshot.toJson().toString().toByteArray(Charsets.UTF_8)
+        val localSecrets = snapshot.secrets.size
+        runCatching {
+            withContext(Dispatchers.IO) {
+                if (!guardChecked) checkRemoteSafe(token, localSecrets)
+                val key = driveKey(token)
+                val blob = BackupCrypto.encryptWithKey(payload, key)
+                val existing = drive.findBackup(token)
+                drive.uploadBackup(token, blob, existing?.id)
+            }
+        }
+            .onSuccess { saved ->
+                _backup.update {
+                    it.copy(
+                        hasRemote = true,
+                        remoteModified = saved.modifiedTime,
+                        autoSavedAt = saved.modifiedTime,
+                        error = null,
+                    )
+                }
+            }
+            .onFailure { e ->
+                _backup.update { it.copy(autoActive = false, error = e.message ?: "Не удалось сохранить копию") }
+            }
+    }
+
+    /**
+     * Перед первой в этой сессии автоматической копией смотрим, что лежит в Drive. Если там
+     * копия с большим числом секретов (приложение открыли на новом устройстве) или копия
+     * старого формата, автоматически перезаписывать её нельзя — иначе хорошая копия пропадёт.
+     */
+    private suspend fun checkRemoteSafe(token: String, localSecrets: Int) {
+        val remote = drive.findBackup(token)
+        if (remote == null) {
+            guardChecked = true
+            return
+        }
+        val blob = drive.download(token, remote.id)
+        if (BackupCrypto.isPassphraseBackup(blob)) {
+            throw IllegalStateException(
+                "В Google Drive лежит копия старого формата (с фразой). Чтобы её не затереть, автоматически " +
+                    "не сохраняю. Нажмите «Сохранить сейчас», если готовы её заменить.",
+            )
+        }
+        val remoteSecrets = runCatching {
+            val key = driveKey(token)
+            val json = String(BackupCrypto.decryptWithKey(blob, key), Charsets.UTF_8)
+            JSONObject(json).optJSONArray("secrets")?.length() ?: 0
+        }.getOrDefault(0)
+        if (!BackupSafety.safeToOverwrite(localSecrets, remoteSecrets)) {
+            throw IllegalStateException(
+                "В Google Drive копия, где секретов больше ($remoteSecrets против $localSecrets). Автоматически " +
+                    "не сохраняю, чтобы её не затереть: сначала «Восстановить из Google Drive».",
+            )
+        }
+        guardChecked = true
+    }
+
+    /** Ручное сохранение — явное действие, поэтому ничего не переспрашиваем. */
+    fun createBackup(token: String) {
         _backup.update { it.copy(running = true, error = null, message = null) }
         val snapshot = data
-        viewModelScope.launch(Dispatchers.IO) {
+        val payload = snapshot.toJson().toString().toByteArray(Charsets.UTF_8)
+        viewModelScope.launch {
             runCatching {
-                val blob = BackupCrypto.encrypt(
-                    snapshot.toJson().toString().toByteArray(Charsets.UTF_8),
-                    passphrase.toCharArray(),
-                )
-                val existing = drive.findBackup(token)
-                drive.upload(token, blob, existing?.id)
+                withContext(Dispatchers.IO) {
+                    val key = driveKey(token)
+                    val blob = BackupCrypto.encryptWithKey(payload, key)
+                    val existing = drive.findBackup(token)
+                    drive.uploadBackup(token, blob, existing?.id)
+                }
             }
                 .onSuccess { saved ->
+                    guardChecked = true
                     _backup.update {
                         it.copy(
                             running = false,
                             hasRemote = true,
                             remoteModified = saved.modifiedTime,
+                            autoSavedAt = saved.modifiedTime,
+                            error = null,
                             message = "Копия сохранена в Google Drive${formatRemoteTime(saved.modifiedTime)?.let { " · $it" } ?: ""}",
                         )
                     }
@@ -701,42 +869,64 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Скачивает копию, расшифровывает её фразой и заменяет локальные данные. */
-    fun restoreBackup(token: String, passphrase: String) {
+    /**
+     * Скачивает копию и заменяет локальные данные. Обычно копия зашифрована ключом, который
+     * лежит рядом в Drive, — тогда фраза не нужна. Копии, сделанные старыми версиями, шифровались
+     * фразой: для них просим её ввести.
+     */
+    fun restoreBackup(token: String, passphrase: String? = null) {
         _backup.update { it.copy(running = true, error = null, message = null) }
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                val file = drive.findBackup(token) ?: throw IllegalStateException("В Google Drive нет резервной копии")
-                val blob = drive.download(token, file.id)
-                val json = String(BackupCrypto.decrypt(blob, passphrase.toCharArray()), Charsets.UTF_8)
-                VaultData.fromJson(JSONObject(json)) to file
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val file = drive.findBackup(token) ?: throw IllegalStateException("В Google Drive нет резервной копии")
+                    val blob = drive.download(token, file.id)
+                    val json = if (BackupCrypto.isPassphraseBackup(blob)) {
+                        val phrase = passphrase?.takeIf { it.isNotBlank() } ?: throw PhraseRequired()
+                        String(BackupCrypto.decrypt(blob, phrase.toCharArray()), Charsets.UTF_8)
+                    } else {
+                        String(BackupCrypto.decryptWithKey(blob, driveKey(token)), Charsets.UTF_8)
+                    }
+                    VaultData.fromJson(JSONObject(json)) to file
+                }
             }
+            result
                 .onSuccess { (restored, file) ->
-                    withContext(Dispatchers.Main) {
-                        data = restored
-                        persist()
-                        publish()
-                        restored.categories.forEach { ensureIconFor(it.id) }
-                        _backup.update {
-                            it.copy(
-                                running = false,
-                                hasRemote = true,
-                                remoteModified = file.modifiedTime,
-                                message = "Данные восстановлены: ${restored.secrets.size} секретов · ${restored.categories.size} категорий",
-                            )
-                        }
+                    data = restored
+                    guardChecked = true
+                    persist()
+                    publish()
+                    restored.categories.forEach { ensureIconFor(it.id) }
+                    _backup.update {
+                        it.copy(
+                            running = false,
+                            hasRemote = true,
+                            remoteModified = file.modifiedTime,
+                            phraseRequired = false,
+                            error = null,
+                            message = "Данные восстановлены: ${restored.secrets.size} секретов · ${restored.categories.size} категорий",
+                        )
                     }
                 }
                 .onFailure { e ->
-                    val message = if (e is AEADBadTagException) {
-                        "Неверная фраза — расшифровать копию не удалось"
-                    } else {
-                        e.message
+                    val message = when {
+                        e is PhraseRequired -> "Копия сделана старой версией — введите фразу, которой она шифровалась"
+                        e is AEADBadTagException -> "Расшифровать копию не удалось: неверная фраза или ключ не подходит"
+                        else -> e.message
                     }
-                    _backup.update { it.copy(running = false, error = message ?: "Не удалось восстановить копию") }
+                    _backup.update {
+                        it.copy(
+                            running = false,
+                            phraseRequired = e is PhraseRequired,
+                            error = message ?: "Не удалось восстановить копию",
+                        )
+                    }
                 }
         }
     }
+
+    /** Копия сделана с фразой — без неё не расшифровать. */
+    private class PhraseRequired : Exception()
 
     private fun formatRemoteTime(raw: String?): String? = runCatching {
         raw ?: return null

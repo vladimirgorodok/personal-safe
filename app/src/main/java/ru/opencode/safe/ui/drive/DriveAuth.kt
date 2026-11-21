@@ -3,7 +3,9 @@ package ru.opencode.safe.ui.drive
 import android.accounts.Account
 import android.app.Activity
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import com.google.android.gms.auth.api.identity.AuthorizationClient
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
@@ -51,9 +53,10 @@ object DriveAuth {
      */
     suspend fun requestToken(activity: Activity, account: String? = null): String {
         cachedToken()?.let { return it }
+        val client = Identity.getAuthorizationClient(activity)
         if (!account.isNullOrBlank()) {
             try {
-                return authorize(activity, Account(account, GOOGLE_ACCOUNT_TYPE))
+                return authorize(client, Account(account, GOOGLE_ACCOUNT_TYPE))
             } catch (approval: ApprovalRequired) {
                 throw approval
             } catch (e: ApiException) {
@@ -63,7 +66,7 @@ object DriveAuth {
             }
         }
         return try {
-            authorize(activity, null)
+            authorize(client, null)
         } catch (e: ApiException) {
             val intent = e.status.resolution
             if (e.status.hasResolution() && intent != null) throw ApprovalRequired(intent)
@@ -81,10 +84,33 @@ object DriveAuth {
         return remember(result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive"))
     }
 
-    private suspend fun authorize(activity: Activity, account: Account?): String {
+    /**
+     * Пробует получить токен молча — без окон и выбора аккаунта. Так работает автоматическая
+     * копия после изменений. Если Google хочет показать экран согласия (первый раз, отзыв
+     * доступа) или что-то не так, возвращаем null: окно согласия показываем только по кнопке.
+     */
+    suspend fun silentToken(context: Context, account: String?): String? {
+        cachedToken()?.let { return it }
+        return try {
+            val result = Identity.getAuthorizationClient(context).authorize(request(account)).awaitTask()
+            if (result.hasResolution()) return null
+            ensureScope(result)
+            result.accessToken?.let(::remember)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun request(account: String?): AuthorizationRequest {
+        val builder = AuthorizationRequest.builder().setRequestedScopes(listOf(SCOPE))
+        if (!account.isNullOrBlank()) builder.setAccount(Account(account, GOOGLE_ACCOUNT_TYPE))
+        return builder.build()
+    }
+
+    private suspend fun authorize(client: AuthorizationClient, account: Account?): String {
         val builder = AuthorizationRequest.builder().setRequestedScopes(listOf(SCOPE))
         if (account != null) builder.setAccount(account)
-        val result = Identity.getAuthorizationClient(activity).authorize(builder.build()).awaitTask()
+        val result = client.authorize(builder.build()).awaitTask()
         if (result.hasResolution() && result.pendingIntent != null) {
             throw ApprovalRequired(result.pendingIntent!!)
         }

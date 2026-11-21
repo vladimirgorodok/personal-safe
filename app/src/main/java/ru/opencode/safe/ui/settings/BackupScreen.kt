@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
@@ -33,6 +34,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -50,7 +52,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
-import ru.opencode.safe.data.backup.BackupCrypto
 import ru.opencode.safe.data.backup.DriveErrors
 import ru.opencode.safe.ui.BackupState
 import ru.opencode.safe.ui.components.GlassCard
@@ -58,23 +59,27 @@ import ru.opencode.safe.ui.components.SafeTopBar
 import ru.opencode.safe.ui.drive.DriveAuth
 
 /**
- * Резервная копия сейфа в Google Drive. Копия шифруется фразой ниже и лежит в скрытой
- * папке приложения, поэтому прочитать её может только «Личный сейф» с этой фразой.
+ * Резервная копия сейфа в Google Drive.
+ *
+ * Копия шифруется случайным ключом, который лежит рядом — отдельным файлом в скрытой папке
+ * приложения. Поэтому фразу вводить не нужно: копия сохраняется сама после каждого изменения.
+ * Взамен копию защищает доступ к Google-аккаунту.
  */
 @Composable
 fun BackupScreen(
     state: BackupState,
     accountEmail: String?,
+    autoBackup: Boolean,
     activity: Activity?,
     onBack: () -> Unit,
+    onAutoBackup: (Boolean) -> Unit,
     onRefresh: (String) -> Unit,
-    onBackup: (String, String) -> Unit,
-    onRestore: (String, String) -> Unit,
+    onBackup: (String) -> Unit,
+    onRestore: (String, String?) -> Unit,
     onOpenLink: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    var passphrase by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
+    var phrase by remember { mutableStateOf("") }
     var localError by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf<CompletableDeferred<Intent>?>(null) }
 
@@ -122,9 +127,14 @@ fun BackupScreen(
 
     LaunchedEffect(Unit) { withToken { onRefresh(it) } }
 
-    val tooShort = passphrase.isNotEmpty() && passphrase.length < BackupCrypto.MIN_PASSPHRASE
-    val mismatch = confirm.isNotEmpty() && confirm != passphrase
-    val ready = passphrase.length >= BackupCrypto.MIN_PASSPHRASE && passphrase == confirm
+    val stamp = state.remoteModified?.take(16)?.replace('T', ' ')
+    val autoSaved = state.autoSavedAt?.take(16)?.replace('T', ' ')
+    val autoLine = when {
+        !autoBackup -> "Автоматическая копия выключена"
+        !state.autoActive -> "Ждёт разрешения на доступ к Drive — нажмите «Сохранить сейчас»"
+        autoSaved == null -> "Работает"
+        else -> "Работает · последняя копия $autoSaved"
+    }
 
     Scaffold(containerColor = Color.Transparent) { padding ->
         LazyColumn(
@@ -170,12 +180,8 @@ fun BackupScreen(
                         }
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            if (state.hasRemote) {
-                                "Копия есть на Google Диске" +
-                                    (state.remoteModified?.let { " · ${it.take(16).replace('T', ' ')}" } ?: "")
-                            } else {
-                                "Копий пока нет"
-                            },
+                            if (state.hasRemote) "Копия есть на Google Диске" + (stamp?.let { " · $it" } ?: "")
+                            else "Копий пока нет",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -186,52 +192,64 @@ fun BackupScreen(
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Фраза для шифрования", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Копия шифруется этой фразой прямо на телефоне. Запомните её: без неё восстановить " +
-                                "данные на новом устройстве нельзя, и восстановить фразу мы тоже не сможем.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = passphrase,
-                            onValueChange = { passphrase = it },
-                            label = { Text("Фраза") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            isError = tooShort,
-                            supportingText = {
-                                if (tooShort) Text("Минимум ${BackupCrypto.MIN_PASSPHRASE} символов")
-                            },
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Автоматическая копия", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "Копия уходит в Drive через несколько секунд после каждого изменения",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Switch(checked = autoBackup, onCheckedChange = onAutoBackup)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = confirm,
-                            onValueChange = { confirm = it },
-                            label = { Text("Повторите фразу") },
-                            singleLine = true,
-                            visualTransformation = PasswordVisualTransformation(),
-                            isError = mismatch,
-                            supportingText = { if (mismatch) Text("Фразы не совпадают") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                        )
+                        ) {
+                            Text(
+                                autoLine,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(10.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (state.phraseRequired) {
+                item {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Копия сделана с фразой", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Эта копия сохранена более старой версией приложения, где данные шифровались фразой. " +
+                                    "Введите ту же фразу, чтобы её прочитать.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = phrase,
+                                onValueChange = { phrase = it },
+                                label = { Text("Фраза") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -239,18 +257,18 @@ fun BackupScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
-                        onClick = { withToken { token -> onBackup(token, passphrase) } },
-                        enabled = ready && !state.running,
+                        onClick = { withToken { token -> onBackup(token) } },
+                        enabled = !state.running,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                     ) {
                         Icon(Icons.Rounded.CloudUpload, null, Modifier.size(20.dp))
                         Spacer(Modifier.width(10.dp))
-                        Text("Сохранить в Google Drive", fontWeight = FontWeight.SemiBold)
+                        Text("Сохранить сейчас", fontWeight = FontWeight.SemiBold)
                     }
                     OutlinedButton(
-                        onClick = { withToken { token -> onRestore(token, passphrase) } },
-                        enabled = ready && !state.running,
+                        onClick = { withToken { token -> onRestore(token, phrase.takeIf { it.isNotBlank() }) } },
+                        enabled = !state.running,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                     ) {
@@ -260,6 +278,25 @@ fun BackupScreen(
                     }
                     Text(
                         "Восстановление заменяет текущие данные тем, что лежит в копии.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item {
+                Row {
+                    Icon(
+                        Icons.Rounded.Info,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Ключ шифрования копии хранится в той же скрытой папке на Google Диске, поэтому фразу " +
+                            "вводить не нужно — но и копию защищает доступ к вашему Google-аккаунту. " +
+                            "Включите двухэтапную аутентификацию в Google и «Вход по биометрии» здесь, в настройках.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
