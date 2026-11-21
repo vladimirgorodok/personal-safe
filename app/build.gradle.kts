@@ -18,7 +18,7 @@ val canSignRelease = releaseKeystore.exists() &&
 // чтобы вход через Google работал сразу, без настройки в приложении. Переопределяется
 // переменной окружения SAFE_GOOGLE_CLIENT_ID при сборке.
 val googleClientId = System.getenv("SAFE_GOOGLE_CLIENT_ID")
-    ?: "713092695513-enq5kl5puh079me3r2ldg46jdh97eb5r.apps.googleusercontent.com"
+    ?: "713092695513-enq5kl5puh079me3r21dg46jdh97eb5r.apps.googleusercontent.com"
 
 android {
     namespace = "ru.opencode.safe"
@@ -28,8 +28,8 @@ android {
         applicationId = "ru.opencode.safe"
         minSdk = 26
         targetSdk = 34
-        versionCode = 18
-        versionName = "2.7"
+        versionCode = 19
+        versionName = "2.8"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
     }
