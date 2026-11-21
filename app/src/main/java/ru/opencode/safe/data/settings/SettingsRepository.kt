@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import ru.opencode.safe.BuildConfig
 
 private val Context.settingsDataStore by preferencesDataStore(name = "safe_settings")
 
@@ -41,7 +42,7 @@ class SettingsRepository(private val context: Context) {
             borderOpacity = p[Keys.BORDER_OPACITY] ?: 1f,
             splashEnabled = p[Keys.SPLASH] ?: true,
             aiSuggestCategory = p[Keys.AI_SUGGEST] ?: true,
-            googleClientId = p[Keys.CLIENT_ID] ?: "",
+            googleClientId = p[Keys.CLIENT_ID]?.takeIf { it.isNotBlank() } ?: BuildConfig.GOOGLE_CLIENT_ID,
             biometricLock = p[Keys.BIOMETRIC] ?: false,
             rememberSignIn = p[Keys.REMEMBER_SIGN_IN] ?: true,
             autoBackup = p[Keys.AUTO_BACKUP] ?: true,

@@ -258,7 +258,7 @@ fun AuthScreen(
 
             Spacer(Modifier.height(14.dp))
             Text(
-                "Ключи и секреты шифруются ключом устройства. Google-вход настраивается один раз по Client ID.",
+                "Ключи и секреты шифруются ключом устройства. Google-вход работает сразу: Client ID вшит в сборку.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

@@ -14,6 +14,12 @@ val canSignRelease = releaseKeystore.exists() &&
     !releaseStorePassword.isNullOrBlank() &&
     !releaseKeyPassword.isNullOrBlank()
 
+// Client ID Google-входа. Это публичный идентификатор (не секрет), он вшивается в сборку,
+// чтобы вход через Google работал сразу, без настройки в приложении. Переопределяется
+// переменной окружения SAFE_GOOGLE_CLIENT_ID при сборке.
+val googleClientId = System.getenv("SAFE_GOOGLE_CLIENT_ID")
+    ?: "713092695513-enq5kl5puh079me3r2ldg46jdh97eb5r.apps.googleusercontent.com"
+
 android {
     namespace = "ru.opencode.safe"
     compileSdk = 34
@@ -22,9 +28,10 @@ android {
         applicationId = "ru.opencode.safe"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "2.6"
+        versionCode = 18
+        versionName = "2.7"
         vectorDrawables { useSupportLibrary = true }
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
     }
 
     signingConfigs {
