@@ -338,6 +338,7 @@ private fun ReadyContent(
                 onRefresh = viewModel::refreshDriveBackup,
                 onBackup = viewModel::createBackup,
                 onRestore = viewModel::restoreBackup,
+                onOpenLink = onOpenLink,
             )
 
             is Screen.CategoryDetail -> {

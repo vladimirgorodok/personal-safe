@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import ru.opencode.safe.data.backup.BackupCrypto
+import ru.opencode.safe.data.backup.DriveErrors
 import ru.opencode.safe.ui.BackupState
 import ru.opencode.safe.ui.components.GlassCard
 import ru.opencode.safe.ui.components.SafeTopBar
@@ -69,6 +70,7 @@ fun BackupScreen(
     onRefresh: (String) -> Unit,
     onBackup: (String, String) -> Unit,
     onRestore: (String, String) -> Unit,
+    onOpenLink: (String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var passphrase by remember { mutableStateOf("") }
@@ -272,10 +274,20 @@ fun BackupScreen(
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Row(modifier = Modifier.padding(12.dp)) {
-                            Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row {
+                                Icon(Icons.Rounded.ErrorOutline, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(it, style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (DriveErrors.needsApiEnable(it)) {
+                                Spacer(Modifier.height(10.dp))
+                                OutlinedButton(
+                                    onClick = { onOpenLink(DriveErrors.DRIVE_API_URL) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                ) { Text("Включить Google Drive API") }
+                            }
                         }
                     }
                 }

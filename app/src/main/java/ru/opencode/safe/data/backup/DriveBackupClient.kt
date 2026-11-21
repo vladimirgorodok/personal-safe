@@ -64,7 +64,9 @@ class DriveBackupClient(private val http: OkHttpClient) {
             .get()
             .build()
         http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException(httpError(response.code, "не удалось скачать копию"))
+            if (!response.isSuccessful) {
+                throw IOException(DriveErrors.describe(response.code, response.body?.string().orEmpty(), "не удалось скачать копию"))
+            }
             return response.body?.bytes() ?: throw IOException("Google Drive вернул пустой файл")
         }
     }
@@ -81,16 +83,11 @@ class DriveBackupClient(private val http: OkHttpClient) {
     private fun execute(request: Request, what: String): String =
         http.newCall(request).execute().use { response ->
             val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException(httpError(response.code, what))
+            if (!response.isSuccessful) {
+                throw IOException(DriveErrors.describe(response.code, text, what))
+            }
             text
         }
-
-    private fun httpError(code: Int, what: String): String = when (code) {
-        401 -> "Доступ к Google Drive больше не действует — войдите заново. ($what)"
-        403 -> "Google Drive отклонил запрос. Проверьте, что доступ к Drive разрешён. ($what)"
-        404 -> "Копия не найдена в Google Drive."
-        else -> "$what (код $code)"
-    }
 
     private fun toFile(json: JSONObject) = DriveFile(
         id = json.optString("id"),

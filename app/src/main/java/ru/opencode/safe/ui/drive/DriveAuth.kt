@@ -4,11 +4,13 @@ import android.app.Activity
 import android.app.PendingIntent
 import android.content.Intent
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.suspendCancellableCoroutine
+import ru.opencode.safe.data.backup.DriveErrors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -39,6 +41,7 @@ object DriveAuth {
         if (result.hasResolution() && result.pendingIntent != null) {
             throw ApprovalRequired(result.pendingIntent!!)
         }
+        ensureScope(result)
         return result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive")
     }
 
@@ -48,7 +51,20 @@ object DriveAuth {
         } catch (e: ApiException) {
             throw IllegalStateException(describe(e))
         }
+        ensureScope(result)
         return result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive")
+    }
+
+    /** Если Google сообщил выданные области и нужной среди них нет — говорим об этом прямо. */
+    private fun ensureScope(result: AuthorizationResult) {
+        val granted = result.grantedScopes ?: return
+        if (granted.isNotEmpty() && granted.none { it.contains("drive.appdata") }) {
+            throw IllegalStateException(
+                "Google выдал доступ без нужной области. Разрешено: ${granted.joinToString(", ")}. " +
+                    "Добавьте область ${DriveErrors.SCOPE} на экране согласия OAuth (Data access → Scopes) " +
+                    "и войдите тем же аккаунтом.",
+            )
+        }
     }
 
     private fun describe(e: ApiException): String = when (e.statusCode) {
