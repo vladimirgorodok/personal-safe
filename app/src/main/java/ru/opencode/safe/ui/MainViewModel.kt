@@ -36,6 +36,7 @@ import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.data.model.VaultData
 import ru.opencode.safe.data.settings.DarkMode
 import ru.opencode.safe.data.settings.DisplaySettings
+import ru.opencode.safe.ui.drive.DriveAuth
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.crypto.AEADBadTagException
@@ -53,6 +54,10 @@ data class UiState(
     val toast: String? = null,
     val authError: String? = null,
     val authLoading: Boolean = false,
+    /** Служебные флаги запуска: пока настройки и сейф не загружены, вход ещё не решаем показывать. */
+    val splashDone: Boolean = false,
+    val vaultLoaded: Boolean = false,
+    val settingsLoaded: Boolean = false,
 )
 
 data class AnalyzeState(
@@ -107,7 +112,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             container.settings.settings.collect { display ->
-                _state.update { it.copy(display = display) }
+                _state.update { it.copy(display = display, settingsLoaded = true) }
+                resolveStartPhase()
             }
         }
         loadVault()
@@ -124,6 +130,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (loaded.categories.isEmpty()) persist()
                 publish()
                 seeded.categories.forEach { ensureIconFor(it.id) }
+                _state.update { it.copy(vaultLoaded = true) }
+                resolveStartPhase()
             }
         }
     }
@@ -148,7 +156,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- Заставка и вход ----------------
 
     fun onSplashFinished() {
-        _state.update { it.copy(phase = Phase.AUTH) }
+        _state.update { it.copy(splashDone = true) }
+        resolveStartPhase()
+    }
+
+    /**
+     * Показывает экран входа только если профиля нет или «Запомнить вход» выключено.
+     * Ждём загрузки настроек и сейфа, иначе решение пришлось бы принимать по умолчанию.
+     */
+    private fun resolveStartPhase() {
+        val s = _state.value
+        if (!s.splashDone || !s.vaultLoaded || !s.settingsLoaded) return
+        val next = SessionPolicy.startPhase(s.profile != null, s.display.rememberSignIn)
+        if (s.phase != next) _state.update { it.copy(phase = next) }
     }
 
     fun signInDemo() {
@@ -182,6 +202,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     data = data.copy(profile = profile)
                     persist()
                     publish()
+                    // Аккаунт мог смениться — старый токен Drive больше не подходит.
+                    DriveAuth.forget()
                     _state.update {
                         it.copy(
                             phase = Phase.READY,
@@ -205,6 +227,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         data = data.copy(profile = null)
         persist()
         publish()
+        DriveAuth.forget()
         _state.update { it.copy(phase = Phase.AUTH) }
     }
 
@@ -225,6 +248,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAiSuggest(value: Boolean) = scope { container.settings.setAiSuggest(value) }
     fun setGoogleClientId(value: String) = scope { container.settings.setGoogleClientId(value) }
     fun setBiometric(value: Boolean) = scope { container.settings.setBiometric(value) }
+    fun setRememberSignIn(value: Boolean) = scope { container.settings.setRememberSignIn(value) }
 
     private fun scope(block: suspend () -> Unit) {
         viewModelScope.launch { block() }

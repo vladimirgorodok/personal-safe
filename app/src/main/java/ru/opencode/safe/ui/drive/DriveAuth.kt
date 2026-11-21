@@ -1,5 +1,6 @@
 package ru.opencode.safe.ui.drive
 
+import android.accounts.Account
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.Intent
@@ -20,6 +21,14 @@ import kotlin.coroutines.resumeWithException
  */
 object DriveAuth {
 
+    private const val GOOGLE_ACCOUNT_TYPE = "com.google"
+
+    /** Токен доступа живёт час. Держим его в памяти, чтобы не спрашивать разрешение на каждый экран. */
+    private const val TOKEN_TTL_MS = 50 * 60 * 1000L
+
+    private var cachedToken: String? = null
+    private var cachedUntil = 0L
+
     /** Скрытая папка приложения — файл не виден в «Моём диске». */
     val SCOPE = Scope("https://www.googleapis.com/auth/drive.appdata")
 
@@ -27,22 +36,39 @@ object DriveAuth {
     class ApprovalRequired(val pendingIntent: PendingIntent) :
         Exception("Требуется подтверждение доступа к Google Drive")
 
-    suspend fun requestToken(activity: Activity): String {
-        val request = AuthorizationRequest.builder()
-            .setRequestedScopes(listOf(SCOPE))
-            .build()
-        val result = try {
-            Identity.getAuthorizationClient(activity).authorize(request).awaitTask()
+    /** Токен, полученный ранее в этой сессии и ещё не истёкший. */
+    fun cachedToken(): String? = cachedToken?.takeIf { System.currentTimeMillis() < cachedUntil }
+
+    /** Забыть токен — например, при выходе из аккаунта. */
+    fun forget() {
+        cachedToken = null
+        cachedUntil = 0L
+    }
+
+    /**
+     * @param account почта Google-аккаунта. Если её передать, Google не станет спрашивать,
+     * каким аккаунтом входить, — подставит этот. Если он больше недоступен, спросит обычным образом.
+     */
+    suspend fun requestToken(activity: Activity, account: String? = null): String {
+        cachedToken()?.let { return it }
+        if (!account.isNullOrBlank()) {
+            try {
+                return authorize(activity, Account(account, GOOGLE_ACCOUNT_TYPE))
+            } catch (approval: ApprovalRequired) {
+                throw approval
+            } catch (e: ApiException) {
+                val intent = e.status.resolution
+                if (e.status.hasResolution() && intent != null) throw ApprovalRequired(intent)
+                // Аккаунт не подошёл — повторим без него, Google покажет выбор.
+            }
+        }
+        return try {
+            authorize(activity, null)
         } catch (e: ApiException) {
             val intent = e.status.resolution
             if (e.status.hasResolution() && intent != null) throw ApprovalRequired(intent)
             throw IllegalStateException(describe(e))
         }
-        if (result.hasResolution() && result.pendingIntent != null) {
-            throw ApprovalRequired(result.pendingIntent!!)
-        }
-        ensureScope(result)
-        return result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive")
     }
 
     suspend fun tokenFromIntent(activity: Activity, data: Intent): String {
@@ -52,7 +78,24 @@ object DriveAuth {
             throw IllegalStateException(describe(e))
         }
         ensureScope(result)
-        return result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive")
+        return remember(result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive"))
+    }
+
+    private suspend fun authorize(activity: Activity, account: Account?): String {
+        val builder = AuthorizationRequest.builder().setRequestedScopes(listOf(SCOPE))
+        if (account != null) builder.setAccount(account)
+        val result = Identity.getAuthorizationClient(activity).authorize(builder.build()).awaitTask()
+        if (result.hasResolution() && result.pendingIntent != null) {
+            throw ApprovalRequired(result.pendingIntent!!)
+        }
+        ensureScope(result)
+        return remember(result.accessToken ?: throw IllegalStateException("Google не выдал доступ к Drive"))
+    }
+
+    private fun remember(token: String): String {
+        cachedToken = token
+        cachedUntil = System.currentTimeMillis() + TOKEN_TTL_MS
+        return token
     }
 
     /** Если Google сообщил выданные области и нужной среди них нет — говорим об этом прямо. */

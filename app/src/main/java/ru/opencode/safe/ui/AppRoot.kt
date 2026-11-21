@@ -301,6 +301,7 @@ private fun ReadyContent(
                 onGlass = viewModel::setGlassEffects,
                 onAiSuggest = viewModel::setAiSuggest,
                 onBiometric = onBiometric,
+                onRememberSignIn = viewModel::setRememberSignIn,
                 onSignOut = { viewModel.signOut(); nav.resetTo(Screen.Vault) },
             )
 

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Login
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
@@ -65,6 +66,7 @@ fun SettingsScreen(
     onGlass: (Boolean) -> Unit,
     onAiSuggest: (Boolean) -> Unit,
     onBiometric: (Boolean) -> Unit,
+    onRememberSignIn: (Boolean) -> Unit,
     onSignOut: () -> Unit,
 ) {
     Scaffold(containerColor = Color.Transparent) { padding ->
@@ -111,7 +113,16 @@ fun SettingsScreen(
             item { SectionTitle("Безопасность", Modifier.padding(top = 6.dp)) }
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    SwitchRow(Icons.Rounded.Fingerprint, "Вход по биометрии", "Отпечаток или лицо при запуске", display.biometricLock, onBiometric)
+                    Column {
+                        SwitchRow(Icons.Rounded.Fingerprint, "Вход по биометрии", "Отпечаток или лицо при запуске", display.biometricLock, onBiometric)
+                        SwitchRow(
+                            Icons.Rounded.Login,
+                            "Запомнить вход",
+                            "Не спрашивать Google-аккаунт при каждом запуске",
+                            display.rememberSignIn,
+                            onRememberSignIn,
+                        )
+                    }
                 }
             }
             item {

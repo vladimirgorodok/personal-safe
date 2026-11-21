@@ -17,5 +17,7 @@ data class DisplaySettings(
     val aiSuggestCategory: Boolean = true,
     val googleClientId: String = "",
     val biometricLock: Boolean = false,
+    /** Не спрашивать Google-аккаунт при каждом запуске — входить в сохранённый профиль. */
+    val rememberSignIn: Boolean = true,
     val onboarded: Boolean = false,
 )
