@@ -69,7 +69,9 @@ fun AuthScreen(
     onOpenLink: (String) -> Unit,
 ) {
     val theme = LocalThemeSet.current
-    var showConfig by remember { mutableStateOf(false) }
+    // Если Client ID ещё не задан — сразу показываем инструкцию: иначе Google-вход
+    // выглядит как «нажимаю и ничего не происходит».
+    var showConfig by remember { mutableStateOf(googleClientId.isBlank()) }
 
     Box(
         modifier = Modifier
@@ -158,7 +160,10 @@ fun AuthScreen(
                     }
 
                     Button(
-                        onClick = onGoogle,
+                        onClick = {
+                            if (googleClientId.isBlank()) showConfig = true
+                            onGoogle()
+                        },
                         enabled = !loading && support.available,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -180,6 +185,17 @@ fun AuthScreen(
                     }
 
                     error?.let { AuthErrorBlock(error = it, onCopy = onCopy, onClear = onClearError) }
+
+                    if (googleClientId.isBlank() && error == null) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            "Client ID не задан, поэтому вход через Google не запускается. Инструкция — в блоке «Настроить Google-вход» ниже.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
 
                     Spacer(Modifier.height(10.dp))
                     TextButton(onClick = onDemo, modifier = Modifier.fillMaxWidth()) {

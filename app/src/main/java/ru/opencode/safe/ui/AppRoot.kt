@@ -66,7 +66,7 @@ fun AppRoot() {
     val analyzeState by viewModel.analyze.collectAsState()
     val imageSearchState by viewModel.imageSearch.collectAsState()
     val nav = remember { Navigator() }
-    val activity = context as? Activity
+    val activity = remember(context) { context.findActivity() }
     var unlocked by remember { mutableStateOf(false) }
 
     val dark = resolveDark(state.display.darkMode)
@@ -109,8 +109,14 @@ fun AppRoot() {
                         loading = state.authLoading,
                         onGoogle = {
                             val act = activity
-                            if (act != null) viewModel.signInGoogle(act)
-                            else viewModel.showToast("Не удалось открыть окно входа — попробуйте ещё раз")
+                            if (act != null) {
+                                viewModel.signInGoogle(act)
+                            } else {
+                                viewModel.setAuthError(
+                                    "Не удалось получить доступ к окну приложения, поэтому Google-вход не запустился. " +
+                                        "Закройте приложение полностью и откройте заново."
+                                )
+                            }
                         },
                         onDemo = viewModel::signInDemo,
                         onClientId = viewModel::setGoogleClientId,

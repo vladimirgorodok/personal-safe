@@ -140,6 +140,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearAuthError() = _state.update { it.copy(authError = null) }
 
+    fun setAuthError(message: String) = _state.update { it.copy(authError = message, authLoading = false) }
+
     fun signInGoogle(activity: Activity) {
         val clientId = _state.value.display.googleClientId.trim()
         if (clientId.isBlank()) {

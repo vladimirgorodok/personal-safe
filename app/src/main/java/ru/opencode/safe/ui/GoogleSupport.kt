@@ -1,9 +1,24 @@
 package ru.opencode.safe.ui
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
+
+/**
+ * Достаёт Activity из цепочки ContextWrapper. `context as? Activity` иногда даёт null,
+ * если контекст обёрнут темой — и тогда вход в Google молча не запускается.
+ */
+fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
 
 /** Состояние всего, от чего зависит вход через Google на этом устройстве. */
 data class GoogleSupport(
