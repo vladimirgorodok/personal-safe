@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
@@ -59,6 +60,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onAppearance: () -> Unit,
     onAiSettings: () -> Unit,
+    onBackup: () -> Unit,
     onSplash: (Boolean) -> Unit,
     onGlass: (Boolean) -> Unit,
     onAiSuggest: (Boolean) -> Unit,
@@ -110,6 +112,15 @@ fun SettingsScreen(
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     SwitchRow(Icons.Rounded.Fingerprint, "Вход по биометрии", "Отпечаток или лицо при запуске", display.biometricLock, onBiometric)
+                }
+            }
+            item {
+                GlassCard(modifier = Modifier.fillMaxWidth(), onClick = onBackup) {
+                    SettingRow(
+                        Icons.Rounded.CloudUpload,
+                        "Резервная копия",
+                        "Сохранить сейф в Google Drive и восстановить на другом устройстве",
+                    )
                 }
             }
 

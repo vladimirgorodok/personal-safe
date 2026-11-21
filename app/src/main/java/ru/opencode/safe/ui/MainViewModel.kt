@@ -17,12 +17,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import org.json.JSONObject
 import ru.opencode.safe.SafeApp
 import ru.opencode.safe.data.ai.AgentInput
 import ru.opencode.safe.data.ai.AgentResult
 import ru.opencode.safe.data.ai.AgentSource
 import ru.opencode.safe.data.ai.BrandCatalog
 import ru.opencode.safe.data.ai.Heuristics
+import ru.opencode.safe.data.backup.BackupCrypto
+import ru.opencode.safe.data.backup.DriveBackupClient
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
@@ -33,6 +36,9 @@ import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.data.model.VaultData
 import ru.opencode.safe.data.settings.DarkMode
 import ru.opencode.safe.data.settings.DisplaySettings
+import java.text.SimpleDateFormat
+import java.util.Locale
+import javax.crypto.AEADBadTagException
 
 enum class Phase { SPLASH, AUTH, READY }
 
@@ -67,6 +73,15 @@ data class ImageSearchState(
     val error: String? = null,
 )
 
+/** Состояние резервной копии в Google Drive. */
+data class BackupState(
+    val running: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
+    val hasRemote: Boolean = false,
+    val remoteModified: String? = null,
+)
+
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val container = (app as SafeApp).container
@@ -81,6 +96,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _imageSearch = MutableStateFlow(ImageSearchState())
     val imageSearch: StateFlow<ImageSearchState> = _imageSearch.asStateFlow()
+
+    private val _backup = MutableStateFlow(BackupState())
+    val backup: StateFlow<BackupState> = _backup.asStateFlow()
+
+    private val drive = DriveBackupClient(container.http)
 
     private val brandIconRequests = mutableSetOf<String>()
 
@@ -601,6 +621,105 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             onResult(result)
         }
     }
+
+    // ---------------- Резервная копия (Google Drive) ----------------
+
+    fun clearBackupStatus() = _backup.update { it.copy(message = null, error = null) }
+
+    /** Проверяет, есть ли в Google Drive сохранённая копия. */
+    fun refreshDriveBackup(token: String) {
+        _backup.update { it.copy(running = true, error = null, message = null) }
+        viewModelScope.launch {
+            runCatching { drive.findBackup(token) }
+                .onSuccess { file ->
+                    _backup.update {
+                        it.copy(running = false, hasRemote = file != null, remoteModified = file?.modifiedTime)
+                    }
+                }
+                .onFailure { e ->
+                    _backup.update { it.copy(running = false, error = e.message ?: "Не удалось проверить копии") }
+                }
+        }
+    }
+
+    /** Шифрует сейф фразой и заливает в скрытую папку приложения на Google Диске. */
+    fun createBackup(token: String, passphrase: String) {
+        if (passphrase.length < BackupCrypto.MIN_PASSPHRASE) {
+            _backup.update {
+                it.copy(error = "Фраза слишком короткая: нужно минимум ${BackupCrypto.MIN_PASSPHRASE} символов")
+            }
+            return
+        }
+        _backup.update { it.copy(running = true, error = null, message = null) }
+        val snapshot = data
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val blob = BackupCrypto.encrypt(
+                    snapshot.toJson().toString().toByteArray(Charsets.UTF_8),
+                    passphrase.toCharArray(),
+                )
+                val existing = drive.findBackup(token)
+                drive.upload(token, blob, existing?.id)
+            }
+                .onSuccess { saved ->
+                    _backup.update {
+                        it.copy(
+                            running = false,
+                            hasRemote = true,
+                            remoteModified = saved.modifiedTime,
+                            message = "Копия сохранена в Google Drive${formatRemoteTime(saved.modifiedTime)?.let { " · $it" } ?: ""}",
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _backup.update { it.copy(running = false, error = e.message ?: "Не удалось сохранить копию") }
+                }
+        }
+    }
+
+    /** Скачивает копию, расшифровывает её фразой и заменяет локальные данные. */
+    fun restoreBackup(token: String, passphrase: String) {
+        _backup.update { it.copy(running = true, error = null, message = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val file = drive.findBackup(token) ?: throw IllegalStateException("В Google Drive нет резервной копии")
+                val blob = drive.download(token, file.id)
+                val json = String(BackupCrypto.decrypt(blob, passphrase.toCharArray()), Charsets.UTF_8)
+                VaultData.fromJson(JSONObject(json)) to file
+            }
+                .onSuccess { (restored, file) ->
+                    withContext(Dispatchers.Main) {
+                        data = restored
+                        persist()
+                        publish()
+                        restored.categories.forEach { ensureIconFor(it.id) }
+                        _backup.update {
+                            it.copy(
+                                running = false,
+                                hasRemote = true,
+                                remoteModified = file.modifiedTime,
+                                message = "Данные восстановлены: ${restored.secrets.size} секретов · ${restored.categories.size} категорий",
+                            )
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    val message = if (e is AEADBadTagException) {
+                        "Неверная фраза — расшифровать копию не удалось"
+                    } else {
+                        e.message
+                    }
+                    _backup.update { it.copy(running = false, error = message ?: "Не удалось восстановить копию") }
+                }
+        }
+    }
+
+    private fun formatRemoteTime(raw: String?): String? = runCatching {
+        raw ?: return null
+        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+        parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        parser.parse(raw.take(19))?.let { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(it) }
+    }.getOrNull()
 
     // ---------------- Вспомогательное ----------------
 

@@ -43,6 +43,7 @@ import ru.opencode.safe.ui.nav.Navigator
 import ru.opencode.safe.ui.nav.Screen
 import ru.opencode.safe.ui.settings.AiSettingsScreen
 import ru.opencode.safe.ui.settings.AppearanceScreen
+import ru.opencode.safe.ui.settings.BackupScreen
 import ru.opencode.safe.ui.settings.SettingsScreen
 import ru.opencode.safe.ui.splash.SplashScreen
 import ru.opencode.safe.ui.theme.LocalThemeSet
@@ -66,6 +67,7 @@ fun AppRoot() {
     val state by viewModel.state.collectAsState()
     val analyzeState by viewModel.analyze.collectAsState()
     val imageSearchState by viewModel.imageSearch.collectAsState()
+    val backupState by viewModel.backup.collectAsState()
     val nav = remember { Navigator() }
     val activity = remember(context) { context.findActivity() }
     var unlocked by remember { mutableStateOf(false) }
@@ -146,10 +148,12 @@ fun AppRoot() {
                                 state = state,
                                 analyzeState = analyzeState,
                                 imageSearchState = imageSearchState,
+                                backupState = backupState,
                                 nav = nav,
                                 viewModel = viewModel,
                                 signatureSha1 = signatureSha1,
                                 googleSupport = googleSupport,
+                                activity = activity,
                                 onBiometric = { enabled ->
                                     viewModel.setBiometric(enabled)
                                     if (enabled) unlocked = true
@@ -197,10 +201,12 @@ private fun ReadyContent(
     state: UiState,
     analyzeState: AnalyzeState,
     imageSearchState: ImageSearchState,
+    backupState: BackupState,
     nav: Navigator,
     viewModel: MainViewModel,
     signatureSha1: String?,
     googleSupport: GoogleSupport,
+    activity: Activity?,
     onBiometric: (Boolean) -> Unit,
     onOpenLink: (String) -> Unit,
     onPickedUri: (Uri) -> Unit,
@@ -290,6 +296,7 @@ private fun ReadyContent(
                 onBack = { nav.pop() },
                 onAppearance = { nav.push(Screen.Appearance) },
                 onAiSettings = { nav.push(Screen.AiSettings) },
+                onBackup = { nav.push(Screen.Backup) },
                 onSplash = viewModel::setSplashEnabled,
                 onGlass = viewModel::setGlassEffects,
                 onAiSuggest = viewModel::setAiSuggest,
@@ -321,6 +328,16 @@ private fun ReadyContent(
                 onSave = { viewModel.saveAiConfig(it); viewModel.showToast("Настройки агента сохранены") },
                 onTest = { viewModel.testAiConfig(it) {} },
                 onLoadModels = { config, callback -> viewModel.loadModels(config, callback) },
+            )
+
+            Screen.Backup -> BackupScreen(
+                state = backupState,
+                accountEmail = state.profile?.email,
+                activity = activity,
+                onBack = { nav.pop() },
+                onRefresh = viewModel::refreshDriveBackup,
+                onBackup = viewModel::createBackup,
+                onRestore = viewModel::restoreBackup,
             )
 
             is Screen.CategoryDetail -> {

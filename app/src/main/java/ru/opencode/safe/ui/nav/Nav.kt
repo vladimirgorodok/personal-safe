@@ -10,6 +10,7 @@ sealed interface Screen {
     data object Settings : Screen
     data object Appearance : Screen
     data object AiSettings : Screen
+    data object Backup : Screen
     data class CategoryDetail(val categoryId: String) : Screen
     data class CategoryEdit(val categoryId: String?) : Screen
     data class SecretDetail(val secretId: String) : Screen
