@@ -18,6 +18,13 @@ class GoogleErrorHintTest {
     }
 
     @Test
+    fun `ошибка 28444 распознаётся как неверный developer console`() {
+        val hint = googleErrorHint(IllegalStateException("[28444] Developer console is not set up correctly."))
+        assertTrue(hint.contains("28444"))
+        assertTrue(hint.contains("Android-клиент"))
+    }
+
+    @Test
     fun `ошибка про веб-клиент подсказывает про Web application`() {
         val hint = googleErrorHint(IllegalStateException("serverClientId must be a web client ID"))
         assertTrue(hint.contains("Web application"))

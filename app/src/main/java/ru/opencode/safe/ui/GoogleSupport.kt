@@ -63,9 +63,12 @@ fun googleErrorHint(error: Throwable): String {
             "Провайдер входа не настроен. Обычно это значит, что на устройстве нет Google Play Services, " +
                 "либо установлены слишком старые."
 
-        haystack.contains("10:") || haystack.contains("developer_error") || haystack.contains("api: 10") ->
-            "DEVELOPER_ERROR: Google не узнал приложение. Проверьте Android-клиент — имя пакета и SHA-1 " +
-                "должны совпадать с показанными в приложении до символа."
+        haystack.contains("developer console") || haystack.contains("28444") ||
+            haystack.contains("10:") || haystack.contains("developer_error") || haystack.contains("api: 10") ->
+            "Google не узнал приложение (ошибка 28444 / DEVELOPER_ERROR). Нужен Android-клиент: " +
+                "в том же проекте, что и веб-клиент, с именем пакета и SHA-1, показанными ниже. " +
+                "Проверьте, что SHA-1 снят именно с установленной сборки, а не с другой (debug). " +
+                "После создания Android-клиента изменения доходят до Google за несколько минут."
 
         haystack.contains("web client") || haystack.contains("audience") || haystack.contains("client id") ->
             "Этот Client ID не подходит. В приложение нужен Client ID именно веб-записи " +

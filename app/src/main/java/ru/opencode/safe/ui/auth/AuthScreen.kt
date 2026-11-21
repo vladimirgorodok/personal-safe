@@ -318,10 +318,18 @@ private fun AuthErrorBlock(
                     ) { Text("Показать имя пакета и SHA-1 для Android-клиента") }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = onRetry) { Text("Проверить снова") }
-                    TextButton(onClick = onClear) { Text("Скрыть") }
-                    TextButton(onClick = { onCopy(error) }) { Text("Скопировать") }
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) { Text("Проверить снова") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    TextButton(onClick = { onCopy(error) }) { Text("Скопировать текст", maxLines = 1) }
+                    TextButton(onClick = onClear) { Text("Скрыть", maxLines = 1) }
                 }
             }
         }
