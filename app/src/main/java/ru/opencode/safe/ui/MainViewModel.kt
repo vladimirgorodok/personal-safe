@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,8 @@ data class UiState(
     val display: DisplaySettings = DisplaySettings(),
     val brandIcons: Map<String, String> = emptyMap(),
     val toast: String? = null,
+    val authError: String? = null,
+    val authLoading: Boolean = false,
 )
 
 data class AnalyzeState(
@@ -132,27 +135,47 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         data = data.copy(profile = UserProfile(name = "Гость", email = "guest@local", provider = "demo", isDemo = true))
         persist()
         publish()
-        _state.update { it.copy(phase = Phase.READY) }
+        _state.update { it.copy(phase = Phase.READY, authError = null, authLoading = false) }
     }
+
+    fun clearAuthError() = _state.update { it.copy(authError = null) }
 
     fun signInGoogle(activity: Activity) {
         val clientId = _state.value.display.googleClientId.trim()
         if (clientId.isBlank()) {
-            _state.update { it.copy(toast = "Client ID не задан — выполнен демо-вход. Добавьте его в настройках.") }
-            signInDemo()
+            _state.update {
+                it.copy(
+                    authLoading = false,
+                    authError = "Client ID не задан.\n\n" +
+                        "Разверните «Настроить Google-вход» и вставьте Client ID веб-записи из Google Cloud. " +
+                        "Без него Google не может подтвердить приложение, поэтому остаётся только гостевой вход.",
+                )
+            }
             return
         }
+        _state.update { it.copy(authLoading = true, authError = null) }
         viewModelScope.launch {
-            val result = runCatching { GoogleSignIn(activity).signIn(clientId) }
-            result.onSuccess { profile ->
-                data = data.copy(profile = profile)
-                persist()
-                publish()
-                _state.update { it.copy(phase = Phase.READY, toast = "Добро пожаловать, ${profile.name}!") }
-            }.onFailure { e ->
-                _state.update { it.copy(toast = "Google-вход недоступен: ${e.message}. Выполнен демо-вход.") }
-                signInDemo()
-            }
+            runCatching { GoogleSignIn(activity).signIn(clientId) }
+                .onSuccess { profile ->
+                    data = data.copy(profile = profile)
+                    persist()
+                    publish()
+                    _state.update {
+                        it.copy(
+                            phase = Phase.READY,
+                            authLoading = false,
+                            authError = null,
+                            toast = "Добро пожаловать, ${profile.name}!",
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    if (e is GetCredentialCancellationException) {
+                        _state.update { it.copy(authLoading = false, toast = "Вход отменён") }
+                    } else {
+                        _state.update { it.copy(authLoading = false, authError = describeGoogleError(e)) }
+                    }
+                }
         }
     }
 

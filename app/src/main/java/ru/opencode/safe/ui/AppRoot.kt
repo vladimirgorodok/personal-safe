@@ -76,6 +76,10 @@ fun AppRoot() {
         border = state.display.borderOpacity,
     )
     val signatureSha1 = remember { appSignatureSha1(context) }
+    val googleSupport = remember { checkGoogleSupport(context) }
+    val openUrl: (String) -> Unit = { url ->
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    }
 
     LaunchedEffect(state.display.splashEnabled) {
         if (!state.display.splashEnabled && state.phase == Phase.SPLASH) viewModel.onSplashFinished()
@@ -97,8 +101,22 @@ fun AppRoot() {
                     Phase.SPLASH -> SplashScreen(onFinished = viewModel::onSplashFinished)
                     Phase.AUTH -> AuthScreen(
                         profile = state.profile,
-                        onGoogle = { activity?.let { viewModel.signInGoogle(it) } ?: viewModel.signInDemo() },
+                        googleClientId = state.display.googleClientId,
+                        packageName = context.packageName,
+                        signatureSha1 = signatureSha1,
+                        support = googleSupport,
+                        error = state.authError,
+                        loading = state.authLoading,
+                        onGoogle = {
+                            val act = activity
+                            if (act != null) viewModel.signInGoogle(act)
+                            else viewModel.showToast("Не удалось открыть окно входа — попробуйте ещё раз")
+                        },
                         onDemo = viewModel::signInDemo,
+                        onClientId = viewModel::setGoogleClientId,
+                        onClearError = viewModel::clearAuthError,
+                        onCopy = { text -> viewModel.copyToClipboard(context, text, "Текст ошибки") },
+                        onOpenLink = openUrl,
                     )
                     Phase.READY -> {
                         if (state.display.biometricLock && !unlocked) {
@@ -116,6 +134,7 @@ fun AppRoot() {
                                 nav = nav,
                                 viewModel = viewModel,
                                 signatureSha1 = signatureSha1,
+                                googleSupport = googleSupport,
                                 onBiometric = { enabled ->
                                     viewModel.setBiometric(enabled)
                                     if (enabled) unlocked = true
@@ -166,6 +185,7 @@ private fun ReadyContent(
     nav: Navigator,
     viewModel: MainViewModel,
     signatureSha1: String?,
+    googleSupport: GoogleSupport,
     onBiometric: (Boolean) -> Unit,
     onOpenLink: (String) -> Unit,
     onPickedUri: (Uri) -> Unit,
@@ -265,6 +285,7 @@ private fun ReadyContent(
                 display = state.display,
                 signatureSha1 = signatureSha1,
                 packageName = context.packageName,
+                support = googleSupport,
                 onBack = { nav.pop() },
                 onTheme = viewModel::setThemeSet,
                 onDarkMode = viewModel::setDarkMode,

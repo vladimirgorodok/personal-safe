@@ -14,40 +14,63 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.R
 import ru.opencode.safe.data.model.UserProfile
+import ru.opencode.safe.ui.GoogleSupport
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.settings.GoogleSignInCard
 import ru.opencode.safe.ui.theme.LocalThemeSet
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.CloudOff
-import androidx.compose.material.icons.rounded.Shield
 
 @Composable
 fun AuthScreen(
     profile: UserProfile?,
+    googleClientId: String,
+    packageName: String,
+    signatureSha1: String?,
+    support: GoogleSupport,
+    error: String?,
+    loading: Boolean,
     onGoogle: () -> Unit,
     onDemo: () -> Unit,
+    onClientId: (String) -> Unit,
+    onClearError: () -> Unit,
+    onCopy: (String) -> Unit,
+    onOpenLink: (String) -> Unit,
 ) {
     val theme = LocalThemeSet.current
+    var showConfig by remember { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -56,10 +79,10 @@ fun AuthScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 48.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(24.dp))
             Box(
                 modifier = Modifier
                     .size(120.dp)
@@ -80,14 +103,14 @@ fun AuthScreen(
                 textAlign = TextAlign.Center,
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 FeatureChip(Icons.Rounded.Shield, "Шифрование")
                 FeatureChip(Icons.Rounded.AutoAwesome, "ИИ-агент")
                 FeatureChip(Icons.Rounded.CloudOff, "Офлайн")
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(28.dp))
 
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -99,30 +122,141 @@ fun AuthScreen(
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                     }
+
+                    if (!support.available) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp)) {
+                                Icon(
+                                    Icons.Rounded.ErrorOutline,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Google Play Services недоступны",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "Вход через Google работает через Google Play Services, и без них кнопка ниже не сработает " +
+                                            "(${support.playServicesMessage}). Это обычная ситуация на китайских прошивках MIUI/HyperOS. " +
+                                            "Доступен гостевой вход.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
+
                     Button(
                         onClick = onGoogle,
+                        enabled = !loading && support.available,
                         modifier = Modifier.fillMaxWidth().height(54.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF1F2430)),
                     ) {
-                        Icon(painterResource(R.drawable.ic_google), null, modifier = Modifier.size(22.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Text("Войти через Google", fontWeight = FontWeight.SemiBold)
+                        if (loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFF1F2430),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text("Подключение…", fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Icon(painterResource(R.drawable.ic_google), null, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text("Войти через Google", fontWeight = FontWeight.SemiBold)
+                        }
                     }
+
+                    error?.let { AuthErrorBlock(error = it, onCopy = onCopy, onClear = onClearError) }
+
                     Spacer(Modifier.height(10.dp))
                     TextButton(onClick = onDemo, modifier = Modifier.fillMaxWidth()) {
-                        Text("Продолжить без аккаунта")
+                        Text("Продолжить как гость")
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { showConfig = !showConfig; if (showConfig) onClearError() }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (showConfig) "Скрыть настройку Google-входа" else "Настроить Google-вход")
+                    }
+
+                    if (showConfig) {
+                        Spacer(Modifier.height(12.dp))
+                        GoogleSignInCard(
+                            value = googleClientId,
+                            onValueChange = onClientId,
+                            packageName = packageName,
+                            signatureSha1 = signatureSha1,
+                            support = support,
+                            onCopy = onCopy,
+                            onOpenLink = onOpenLink,
+                        )
                     }
                 }
             }
 
             Spacer(Modifier.height(14.dp))
             Text(
-                "Ключи и секреты шифруются ключом устройства. Google-вход — по вашему Client ID (настраивается в разделе «Оформление»).",
+                "Ключи и секреты шифруются ключом устройства. Google-вход настраивается по Client ID в разделе «Оформление».",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+/** Ошибка входа: подсказка сверху, технический текст ниже — его можно скопировать и прислать. */
+@Composable
+private fun AuthErrorBlock(error: String, onCopy: (String) -> Unit, onClear: () -> Unit) {
+    val parts = error.split("\n\nТехнически: ", limit = 2)
+    Column(modifier = Modifier.padding(top = 14.dp)) {
+        Surface(
+            color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Rounded.ErrorOutline,
+                        null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Вход через Google не выполнен",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(parts[0], style = MaterialTheme.typography.bodySmall)
+                if (parts.size > 1) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Технически: ${parts[1]}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { onCopy(error) }) { Text("Скопировать ошибку") }
+                    TextButton(onClick = onClear) { Text("Скрыть") }
+                }
+            }
         }
     }
 }
