@@ -2,7 +2,9 @@ package ru.opencode.safe.ui.settings
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -33,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -59,20 +64,53 @@ fun GoogleSignInCard(
     onCopy: (String) -> Unit,
     onOpenLink: (String) -> Unit,
     modifier: Modifier = Modifier,
+    initiallyExpanded: Boolean = false,
 ) {
     val context = LocalContext.current
     var pasteFailed by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
     val looksLikeClientId = value.isBlank() || value.trim().endsWith(CLIENT_ID_SUFFIX)
 
     GlassCard(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Вход через Google включается двумя записями в Google Cloud Console. Имя пакета и SHA-1 подписи нужны для Android-записи (по ним Google проверяет, что запрос идёт из вашего приложения), а Client ID вы копируете из веб-записи.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Rounded.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Вход через Google", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        when {
+                            value.isBlank() -> "не настроен — доступен гостевой вход"
+                            looksLikeClientId -> "Client ID задан"
+                            else -> "Client ID задан, но формат не похож на Client ID"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    if (expanded) "Свернуть" else "Развернуть",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(if (expanded) 180f else 0f),
+                )
+            }
 
-            Spacer(Modifier.height(16.dp))
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Вход через Google включается двумя записями в Google Cloud Console. Имя пакета и SHA-1 подписи нужны для Android-записи (по ним Google проверяет, что запрос идёт из вашего приложения), а Client ID вы копируете из веб-записи.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Spacer(Modifier.height(16.dp))
             StepHeader("Шаг 0", "Экран согласия — без него Google откажет")
             InstructionStep(1, "Откройте «OAuth consent screen» и заполните название приложения и e-mail поддержки.")
             InstructionStep(2, "Пока статус «Testing», добавьте свой Google-аккаунт в «Test users» — иначе вход запрещён.")
@@ -199,6 +237,8 @@ fun GoogleSignInCard(
                         else -> "задан, но формат не похож на Client ID"
                     },
                 )
+            }
+                }
             }
         }
     }

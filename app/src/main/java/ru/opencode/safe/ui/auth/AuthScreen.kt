@@ -230,6 +230,7 @@ fun AuthScreen(
                             support = support,
                             onCopy = onCopy,
                             onOpenLink = onOpenLink,
+                            initiallyExpanded = true,
                         )
                     }
                 }

@@ -4,18 +4,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- дужка замка -->
     <path
-        android:pathData="M54,24 L74,33 L74,55 C74,70 65,80 54,86 C43,80 34,70 34,55 L34,33 Z"
-        android:strokeWidth="3"
-        android:strokeColor="#FFFFFF"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M48,52 L48,48 A6,6 0 0,1 60,48 L60,52"
-        android:strokeWidth="3.4"
-        android:strokeColor="#FFFFFF"
+        android:pathData="M38,54 L38,45 A16,16 0 0,1 70,45 L70,54"
+        android:strokeWidth="9"
+        android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
+
+    <!-- корпус с вырезанной замочной скважиной (evenOdd) -->
     <path
-        android:pathData="M45,52 L63,52 A3,3 0 0,1 66,55 L66,66 A3,3 0 0,1 63,69 L45,69 A3,3 0 0,1 42,66 L42,55 A3,3 0 0,1 45,52 Z"
-        android:fillColor="#FFFFFF" />
+        android:fillType="evenOdd"
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M35,50 L73,50 A11,11 0 0,1 84,61 L84,71 A11,11 0 0,1 73,82 L35,82 A11,11 0 0,1 24,71 L24,61 A11,11 0 0,1 35,50 Z M54,64 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 M51.5,69.6 L56.5,69.6 L58,79 L50,79 Z" />
 </vector>

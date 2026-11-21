@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Settings
@@ -77,6 +78,7 @@ fun AnalyzeScreen(
     onPasteClipboard: () -> Unit,
     onPickedUri: (Uri) -> Unit,
     onClearAttachments: () -> Unit,
+    onClear: () -> Unit,
     onRun: () -> Unit,
     onSave: (categoryId: String?, newCategoryName: String?) -> Unit,
     onOpenLink: (String) -> Unit,
@@ -87,6 +89,9 @@ fun AnalyzeScreen(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let(onPickedUri)
     }
+
+    val hasData = state.input.isNotBlank() || state.images.isNotEmpty() ||
+        state.imageUrl != null || state.result != null || state.error != null
 
     var selectedCategory by remember(state.result) { mutableStateOf(state.result?.matchedCategoryId) }
     var title by remember(state.result) { mutableStateOf(state.result?.title.orEmpty()) }
@@ -111,6 +116,9 @@ fun AnalyzeScreen(
                     subtitle = "Текст, файл или ссылка на изображение",
                     onBack = onBack,
                     actions = {
+                        IconButton(onClick = onClear, enabled = hasData) {
+                            Icon(Icons.Rounded.DeleteSweep, "Очистить данные анализа")
+                        }
                         IconButton(onClick = onOpenAiSettings) { Icon(Icons.Rounded.Settings, "Настройки ИИ") }
                     },
                 )
@@ -217,6 +225,19 @@ fun AnalyzeScreen(
                         Spacer(Modifier.width(10.dp))
                         Text("Проанализировать", fontWeight = FontWeight.SemiBold)
                     }
+                }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = onClear,
+                    enabled = hasData && !state.running,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Icon(Icons.Rounded.DeleteSweep, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Очистить данные анализа")
                 }
             }
 

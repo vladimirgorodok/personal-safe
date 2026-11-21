@@ -5,34 +5,56 @@
     android:height="64dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- дужка замка -->
     <path
-        android:pathData="M54,24 L74,33 L74,55 C74,70 65,80 54,86 C43,80 34,70 34,55 L34,33 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="34" android:startY="24"
-                android:endX="74" android:endY="86">
-                <item android:offset="0.0" android:color="#8FE9FFFF" />
-                <item android:offset="0.45" android:color="#66A78BFF" />
-                <item android:offset="1.0" android:color="#B37C5CFF" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path
-        android:pathData="M40,32 L52,27 L52,52 L40,58 Z"
-        android:fillColor="#33FFFFFF" />
-    <path
-        android:pathData="M54,24 L74,33 L74,55 C74,70 65,80 54,86 C43,80 34,70 34,55 L34,33 Z"
-        android:strokeWidth="2.4"
-        android:strokeColor="#CCFFFFFF"
-        android:fillColor="#00000000" />
-    <path
-        android:pathData="M48,52 L48,48 A6,6 0 0,1 60,48 L60,52"
-        android:strokeWidth="3.4"
+        android:pathData="M36,52 L36,42 A18,18 0 0,1 72,42 L72,52"
+        android:strokeWidth="10"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
+
+    <!-- корпус замка -->
     <path
-        android:pathData="M45,52 L63,52 A3,3 0 0,1 66,55 L66,66 A3,3 0 0,1 63,69 L45,69 A3,3 0 0,1 42,66 L42,55 A3,3 0 0,1 45,52 Z"
-        android:fillColor="#FFFFFFFF" />
+        android:pathData="M32,48 L76,48 A12,12 0 0,1 88,60 L88,76 A12,12 0 0,1 76,88 L32,88 A12,12 0 0,1 20,76 L20,60 A12,12 0 0,1 32,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="20" android:startY="48"
+                android:endX="88" android:endY="88">
+                <item android:offset="0.0" android:color="#FF8FE9FF" />
+                <item android:offset="0.45" android:color="#FFA78BFF" />
+                <item android:offset="1.0" android:color="#FF7C5CFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- стеклянный блик по верхней кромке -->
+    <path
+        android:pathData="M32,48 L76,48 A12,12 0 0,1 88,60 L88,66 L20,66 L20,60 A12,12 0 0,1 32,48 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54" android:startY="48"
+                android:endX="54" android:endY="66">
+                <item android:offset="0.0" android:color="#59FFFFFF" />
+                <item android:offset="1.0" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- контур корпуса -->
+    <path
+        android:pathData="M32,48 L76,48 A12,12 0 0,1 88,60 L88,76 A12,12 0 0,1 76,88 L32,88 A12,12 0 0,1 20,76 L20,60 A12,12 0 0,1 32,48 Z"
+        android:strokeWidth="2.2"
+        android:strokeColor="#B3FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- замочная скважина -->
+    <path
+        android:pathData="M54,63 m-6.4,0 a6.4,6.4 0 1,0 12.8,0 a6.4,6.4 0 1,0 -12.8,0"
+        android:fillColor="#2A1250" />
+    <path
+        android:pathData="M51.2,67 L56.8,67 L58.8,80 L49.2,80 Z"
+        android:fillColor="#2A1250" />
 </vector>

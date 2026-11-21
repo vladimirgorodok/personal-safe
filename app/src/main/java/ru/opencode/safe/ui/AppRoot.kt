@@ -239,6 +239,7 @@ private fun ReadyContent(
                 onPasteClipboard = { viewModel.readClipboard(context) },
                 onPickedUri = onPickedUri,
                 onClearAttachments = viewModel::clearAttachments,
+                onClear = viewModel::resetAnalyze,
                 onRun = viewModel::runAnalyze,
                 onSave = { categoryId, newName ->
                     viewModel.saveAnalyzedResult(categoryId, newName)

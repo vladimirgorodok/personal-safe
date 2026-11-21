@@ -1,8 +1,8 @@
 package ru.opencode.safe.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
@@ -30,10 +30,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -42,9 +46,9 @@ import ru.opencode.safe.BuildConfig
 import ru.opencode.safe.data.settings.DisplaySettings
 import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.components.ProfileAvatar
 import ru.opencode.safe.ui.components.SafeTopBar
 import ru.opencode.safe.ui.components.SectionTitle
-import ru.opencode.safe.ui.theme.LocalThemeSet
 
 @Composable
 fun SettingsScreen(
@@ -126,25 +130,42 @@ fun SettingsScreen(
 
 @Composable
 private fun ProfileCard(profile: UserProfile?, onSignOut: () -> Unit) {
-    val theme = LocalThemeSet.current
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(52.dp).clip(CircleShape).background(Brush.linearGradient(theme.gradient)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(profile?.name?.take(1)?.uppercase() ?: "?", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+    var expanded by remember { mutableStateOf(false) }
+    GlassCard(modifier = Modifier.fillMaxWidth(), onClick = { expanded = !expanded }) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileAvatar(profile, 44.dp)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(profile?.name ?: "Гость", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        if (profile?.isDemo == false) "Аккаунт Google" else "Локальный профиль",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    if (expanded) "Свернуть" else "Подробнее",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(if (expanded) 180f else 0f),
+                )
             }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(profile?.name ?: "Гость", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(2.dp))
-                Text(profile?.email ?: "локальный профиль", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            TextButton(onClick = onSignOut) {
-                Icon(Icons.Rounded.Logout, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Выйти")
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    Text(
+                        profile?.email?.takeIf { it.isNotBlank() } ?: "локальный профиль",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = onSignOut) {
+                        Icon(Icons.AutoMirrored.Rounded.Logout, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Выйти из аккаунта")
+                    }
+                }
             }
         }
     }

@@ -62,16 +62,20 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
 import ru.opencode.safe.data.model.SecretLink
+import ru.opencode.safe.data.model.UserProfile
+import ru.opencode.safe.ui.theme.LocalThemeSet
 import ru.opencode.safe.ui.theme.LocalUiOpacity
 import java.io.File
 import kotlin.math.abs
@@ -150,8 +154,11 @@ private fun Color.luminanceIsDark(): Boolean = (red * 0.299f + green * 0.587f + 
 @Composable
 fun CategoryAvatar(category: Category, size: Dp = 48.dp) {
     val dir = LocalIconDir.current
-    val path = remember(category.iconFile, dir) {
-        category.iconFile?.let { name -> dir?.let { File(it, name).absolutePath } }
+    // Сгенерированные заглушки — это буквы-инициалы. Вместо них показываем пиктограмму типа:
+    // она читается лучше и выглядит аккуратнее. Реальный логотип бренда (logo_*) остаётся.
+    val hasRealLogo = category.iconFile?.startsWith(GENERATED_PREFIX) == false
+    val path = remember(category.iconFile, dir, hasRealLogo) {
+        if (hasRealLogo) category.iconFile?.let { name -> dir?.let { File(it, name).absolutePath } } else null
     }
     val bitmap = rememberFileBitmap(path)
     val shape = RoundedCornerShape(size * 0.32f)
@@ -204,6 +211,43 @@ fun initialsOf(name: String): String {
         words.isEmpty() -> "?"
         words.size == 1 -> words[0].take(2).uppercase()
         else -> (words[0].take(1) + words[1].take(1)).uppercase()
+    }
+}
+
+/** Префикс имён сгенерированных иконок-заглушек (буквы-инициалы). */
+private const val GENERATED_PREFIX = "gen_"
+
+/**
+ * Аватар пользователя: фото из Google, если оно подгрузилось, иначе — первая буква
+ * имени на градиенте темы. Не требует разрешений: картинка грузится по URL из профиля.
+ */
+@Composable
+fun ProfileAvatar(profile: UserProfile?, size: Dp = 40.dp, modifier: Modifier = Modifier) {
+    val theme = LocalThemeSet.current
+    val bitmap = rememberRemoteBitmap(profile?.avatarUrl)
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(theme.gradient)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = profile?.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(size),
+            )
+        } else {
+            val fontSize = with(LocalDensity.current) { (size.value * 0.42f).sp }
+            Text(
+                profile?.name?.take(1)?.uppercase() ?: "?",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = fontSize,
+            )
+        }
     }
 }
 

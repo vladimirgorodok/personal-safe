@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -63,9 +62,9 @@ import ru.opencode.safe.ui.components.Appear
 import ru.opencode.safe.ui.components.CategoryAvatar
 import ru.opencode.safe.ui.components.EmptyState
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.components.ProfileAvatar
 import ru.opencode.safe.ui.components.SectionTitle
 import ru.opencode.safe.ui.components.mask
-import ru.opencode.safe.ui.theme.LocalThemeSet
 
 @Composable
 fun VaultScreen(
@@ -250,7 +249,6 @@ private fun Header(
     onOpenSettings: () -> Unit,
     onOpenImageSearch: () -> Unit,
 ) {
-    val theme = LocalThemeSet.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -266,19 +264,7 @@ private fun Header(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onOpenImageSearch) { Icon(Icons.Rounded.ImageSearch, "Поиск по изображению") }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Brush.linearGradient(theme.gradient)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    profile?.name?.take(1)?.uppercase() ?: "?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            ProfileAvatar(profile, 40.dp)
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onOpenSettings) { Icon(Icons.Rounded.Settings, "Настройки") }
         }
