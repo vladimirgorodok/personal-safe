@@ -42,6 +42,7 @@ import ru.opencode.safe.ui.GoogleSupport
 import ru.opencode.safe.ui.components.GlassCard
 
 const val GOOGLE_CREDENTIALS_URL = "https://console.cloud.google.com/apis/credentials"
+const val GOOGLE_CONSENT_URL = "https://console.cloud.google.com/apis/credentials/consent"
 private const val CLIENT_ID_SUFFIX = ".apps.googleusercontent.com"
 
 /**
@@ -70,6 +71,21 @@ fun GoogleSignInCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            Spacer(Modifier.height(16.dp))
+            StepHeader("Шаг 0", "Экран согласия — без него Google откажет")
+            InstructionStep(1, "Откройте «OAuth consent screen» и заполните название приложения и e-mail поддержки.")
+            InstructionStep(2, "Пока статус «Testing», добавьте свой Google-аккаунт в «Test users» — иначе вход запрещён.")
+            Spacer(Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = { onOpenLink(GOOGLE_CONSENT_URL) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Rounded.OpenInNew, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Открыть OAuth consent screen")
+            }
 
             Spacer(Modifier.height(16.dp))
             StepHeader("Шаг 1", "Android-клиент — сюда вставляются имя пакета и SHA-1")

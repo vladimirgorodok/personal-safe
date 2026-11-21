@@ -54,9 +54,10 @@ fun googleErrorHint(error: Throwable): String {
 
         haystack.contains("no credential") || haystack.contains("nocredential") ->
             "Google не предложил ни одного аккаунта. Проверьте по порядку: " +
-                "(1) на устройстве добавлен Google-аккаунт; " +
-                "(2) установлены Google Play Services (на китайских прошивках MIUI/HyperOS их обычно нет); " +
-                "(3) на экране согласия OAuth ваш аккаунт добавлен в «Test users», пока приложение в статусе «Testing»."
+                "(1) на устройстве добавлен Google-аккаунт (Настройки → Аккаунты → Google); " +
+                "(2) приложение добавлено в «Test users» на экране согласия OAuth, пока статус «Testing»; " +
+                "(3) Android-клиент создан в том же проекте, что и веб-клиент, с именем пакета и SHA-1 ниже; " +
+                "(4) если включён VPN — отключите его и повторите."
 
         haystack.contains("provider_configuration") || haystack.contains("configuration") ->
             "Провайдер входа не настроен. Обычно это значит, что на устройстве нет Google Play Services, " +

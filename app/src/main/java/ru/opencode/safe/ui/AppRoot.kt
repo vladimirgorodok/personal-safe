@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -80,6 +81,13 @@ fun AppRoot() {
     val openUrl: (String) -> Unit = { url ->
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     }
+    val openAccounts: () -> Unit = {
+        val sync = Intent(Settings.ACTION_SYNC_SETTINGS)
+            .putExtra(Settings.EXTRA_AUTHORITIES, arrayOf("com.google"))
+        runCatching { context.startActivity(sync) }.onFailure {
+            runCatching { context.startActivity(Intent(Settings.ACTION_SYNC_SETTINGS)) }
+        }
+    }
 
     LaunchedEffect(state.display.splashEnabled) {
         if (!state.display.splashEnabled && state.phase == Phase.SPLASH) viewModel.onSplashFinished()
@@ -123,6 +131,7 @@ fun AppRoot() {
                         onClearError = viewModel::clearAuthError,
                         onCopy = { text -> viewModel.copyToClipboard(context, text, "Текст ошибки") },
                         onOpenLink = openUrl,
+                        onOpenAccounts = openAccounts,
                     )
                     Phase.READY -> {
                         if (state.display.biometricLock && !unlocked) {

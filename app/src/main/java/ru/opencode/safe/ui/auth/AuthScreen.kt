@@ -27,6 +27,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +50,7 @@ import ru.opencode.safe.R
 import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.ui.GoogleSupport
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.settings.GOOGLE_CONSENT_URL
 import ru.opencode.safe.ui.settings.GoogleSignInCard
 import ru.opencode.safe.ui.theme.LocalThemeSet
 
@@ -67,6 +69,7 @@ fun AuthScreen(
     onClearError: () -> Unit,
     onCopy: (String) -> Unit,
     onOpenLink: (String) -> Unit,
+    onOpenAccounts: () -> Unit,
 ) {
     val theme = LocalThemeSet.current
     // Если Client ID ещё не задан — сразу показываем инструкцию: иначе Google-вход
@@ -184,7 +187,17 @@ fun AuthScreen(
                         }
                     }
 
-                    error?.let { AuthErrorBlock(error = it, onCopy = onCopy, onClear = onClearError) }
+                    error?.let {
+                        AuthErrorBlock(
+                            error = it,
+                            onCopy = onCopy,
+                            onClear = onClearError,
+                            onRetry = onGoogle,
+                            onOpenAccounts = onOpenAccounts,
+                            onOpenConsent = { onOpenLink(GOOGLE_CONSENT_URL) },
+                            onShowConfig = { showConfig = true },
+                        )
+                    }
 
                     if (googleClientId.isBlank() && error == null) {
                         Spacer(Modifier.height(10.dp))
@@ -235,8 +248,17 @@ fun AuthScreen(
 
 /** Ошибка входа: подсказка сверху, технический текст ниже — его можно скопировать и прислать. */
 @Composable
-private fun AuthErrorBlock(error: String, onCopy: (String) -> Unit, onClear: () -> Unit) {
+private fun AuthErrorBlock(
+    error: String,
+    onCopy: (String) -> Unit,
+    onClear: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenAccounts: () -> Unit,
+    onOpenConsent: () -> Unit,
+    onShowConfig: () -> Unit,
+) {
     val parts = error.split("\n\nТехнически: ", limit = 2)
+    val noCredentials = error.contains("NoCredential", ignoreCase = true)
     Column(modifier = Modifier.padding(top = 14.dp)) {
         Surface(
             color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
@@ -268,9 +290,38 @@ private fun AuthErrorBlock(error: String, onCopy: (String) -> Unit, onClear: () 
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+
+                if (noCredentials) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Что сделать:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onOpenAccounts,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Проверить аккаунты Google на устройстве") }
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onOpenConsent,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Добавить мой аккаунт в Test users") }
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onShowConfig,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Показать имя пакета и SHA-1 для Android-клиента") }
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { onCopy(error) }) { Text("Скопировать ошибку") }
+                    TextButton(onClick = onRetry) { Text("Проверить снова") }
                     TextButton(onClick = onClear) { Text("Скрыть") }
+                    TextButton(onClick = { onCopy(error) }) { Text("Скопировать") }
                 }
             }
         }

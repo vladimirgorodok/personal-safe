@@ -24,10 +24,11 @@ class GoogleErrorHintTest {
     }
 
     @Test
-    fun `отсутствие аккаунтов подсказывает про Play Services и Test users`() {
+    fun `отсутствие аккаунтов подсказывает про аккаунт, Test users и VPN`() {
         val hint = googleErrorHint(IllegalStateException("No credentials available"))
-        assertTrue(hint.contains("Play Services"))
         assertTrue(hint.contains("Test users"))
+        assertTrue(hint.contains("Google-аккаунт"))
+        assertTrue(hint.contains("VPN"))
     }
 
     @Test
