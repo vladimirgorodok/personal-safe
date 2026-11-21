@@ -18,14 +18,15 @@ data class DriveFile(val id: String, val name: String, val modifiedTime: String?
 class DriveBackupClient(private val http: OkHttpClient) {
 
     fun findBackup(token: String): DriveFile? {
-        val url = "$FILES?spaces=appdata&orderBy=modifiedTime%20desc" +
-            "&fields=files(id,name,modifiedTime)"
-        val json = JSONObject(get(token, url))
+        val json = JSONObject(get(token, listUrl()))
         val files = json.optJSONArray("files") ?: JSONArray()
+        // Копий с этим именем быть не должно больше одной, но если есть — берём свежую.
+        // Время в формате RFC 3339, поэтому сравниваем как строки и не просим сортировку у Google.
         return (0 until files.length())
             .mapNotNull { files.optJSONObject(it) }
             .map { toFile(it) }
-            .firstOrNull { it.name == FILE_NAME }
+            .filter { it.name == FILE_NAME }
+            .maxByOrNull { it.modifiedTime ?: "" }
     }
 
     fun upload(token: String, bytes: ByteArray, existingId: String?): DriveFile {
@@ -97,6 +98,14 @@ class DriveBackupClient(private val http: OkHttpClient) {
 
     companion object {
         const val FILE_NAME = "personal-safe-backup.bin"
+
+        /**
+         * Список файлов в скрытой папке приложения. В Drive API v3 она называется
+         * `appDataFolder`: старые написания `appdata` и `appfolder` из v2 отвергаются
+         * с ошибкой 400 «Invalid Value».
+         */
+        fun listUrl(): String = "$FILES?spaces=appDataFolder&fields=files(id,name,modifiedTime)"
+
         private const val FILES = "https://www.googleapis.com/drive/v3/files"
         private const val UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
         private val JSON = "application/json".toMediaType()

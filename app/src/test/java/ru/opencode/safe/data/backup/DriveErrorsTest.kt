@@ -51,4 +51,11 @@ class DriveErrorsTest {
         val text = DriveErrors.describe(500, "", "сервер вернул")
         assertTrue(text.contains("500"))
     }
+
+    @Test
+    fun `неверный параметр запроса назван ошибкой приложения`() {
+        val text = DriveErrors.describe(400, body("invalid", "Invalid Value"), "не удалось получить список копий")
+        assertTrue(text.contains("неверный параметр"))
+        assertFalse(DriveErrors.needsApiEnable(text))
+    }
 }
