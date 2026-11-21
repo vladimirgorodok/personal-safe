@@ -66,7 +66,6 @@ fun SettingsScreen(
     onGlass: (Boolean) -> Unit,
     onAiSuggest: (Boolean) -> Unit,
     onBiometric: (Boolean) -> Unit,
-    onRememberSignIn: (Boolean) -> Unit,
     onSignOut: () -> Unit,
 ) {
     Scaffold(containerColor = Color.Transparent) { padding ->
@@ -113,16 +112,7 @@ fun SettingsScreen(
             item { SectionTitle("Безопасность", Modifier.padding(top = 6.dp)) }
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column {
-                        SwitchRow(Icons.Rounded.Fingerprint, "Вход по биометрии", "Отпечаток или лицо при запуске", display.biometricLock, onBiometric)
-                        SwitchRow(
-                            Icons.Rounded.Login,
-                            "Запомнить вход",
-                            "Не спрашивать Google-аккаунт при каждом запуске",
-                            display.rememberSignIn,
-                            onRememberSignIn,
-                        )
-                    }
+                    SwitchRow(Icons.Rounded.Fingerprint, "Вход по биометрии", "Отпечаток или лицо при запуске", display.biometricLock, onBiometric)
                 }
             }
             item {
@@ -159,7 +149,7 @@ private fun ProfileCard(profile: UserProfile?, onSignOut: () -> Unit) {
                 ProfileAvatar(profile, 44.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(profile?.name ?: "Гость", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(profile?.name ?: "Локальный режим", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(2.dp))
                     Text(
                         if (profile?.isDemo == false) "Аккаунт Google" else "Локальный профиль",
@@ -185,7 +175,7 @@ private fun ProfileCard(profile: UserProfile?, onSignOut: () -> Unit) {
                     TextButton(onClick = onSignOut) {
                         Icon(Icons.AutoMirrored.Rounded.Logout, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Выйти из аккаунта")
+                        Text("Сменить аккаунт или режим")
                     }
                 }
             }

@@ -46,7 +46,16 @@ class AiClient(private val http: OkHttpClient = defaultClient()) : ChatModel {
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw AiException("(${response.code}) ${extractError(body)}", response.code)
+                val detail = extractError(body)
+                val message = if (response.code == 429) {
+                    AiErrors.tooManyRequests(response.headers, detail)
+                } else {
+                    buildString {
+                        append("(${response.code}) $detail")
+                        AiErrors.hintFor(response.code, detail)?.let { append("\n\n").append(it) }
+                    }
+                }
+                throw AiException(message, response.code)
             }
             parseContent(body)
         }
@@ -60,7 +69,15 @@ class AiClient(private val http: OkHttpClient = defaultClient()) : ChatModel {
             .build()
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw AiException("(${response.code}) ${extractError(body)}", response.code)
+            if (!response.isSuccessful) {
+                val detail = extractError(body)
+                val message = if (response.code == 429) {
+                    AiErrors.tooManyRequests(response.headers, detail)
+                } else {
+                    "(${response.code}) $detail"
+                }
+                throw AiException(message, response.code)
+            }
             val data = JSONObject(body).optJSONArray("data") ?: JSONArray()
             (0 until data.length())
                 .mapNotNull { data.optJSONObject(it)?.optString("id")?.ifBlank { null } }
@@ -112,8 +129,12 @@ class AiClient(private val http: OkHttpClient = defaultClient()) : ChatModel {
         fun endpoint(baseUrl: String, path: String): String {
             val base = baseUrl.trim().trimEnd('/')
             val suffix = path.trim('/')
-            return if (base.endsWith("/v1") || base.endsWith("/openai/v1")) "$base/$suffix"
-            else "$base/v1/$suffix"
+            // У Gemini база заканчивается на /v1beta/openai — там путь идёт сразу после /openai.
+            return if (base.endsWith("/v1") || base.endsWith("/openai/v1") || base.endsWith("/openai")) {
+                "$base/$suffix"
+            } else {
+                "$base/v1/$suffix"
+            }
         }
 
         fun sniffMime(bytes: ByteArray): String = when {

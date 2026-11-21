@@ -152,7 +152,7 @@ fun AuthScreen(
                                     Text(
                                         "Вход через Google работает через Google Play Services, и без них кнопка ниже не сработает " +
                                             "(${support.playServicesMessage}). Это обычная ситуация на китайских прошивках MIUI/HyperOS. " +
-                                            "Доступен гостевой вход.",
+                                            "Доступен локальный режим — кнопка «Открыть локальный сейф».",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -187,6 +187,18 @@ fun AuthScreen(
                         }
                     }
 
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onDemo,
+                        enabled = !loading,
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Icon(Icons.Rounded.Shield, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Открыть локальный сейф", fontWeight = FontWeight.SemiBold)
+                    }
+
                     error?.let {
                         AuthErrorBlock(
                             error = it,
@@ -211,12 +223,20 @@ fun AuthScreen(
                     }
 
                     Spacer(Modifier.height(10.dp))
-                    TextButton(onClick = onDemo, modifier = Modifier.fillMaxWidth()) {
-                        Text("Продолжить как гость")
-                    }
+                    Text(
+                        "Локальный режим — данные хранятся только на этом телефоне, без аккаунта и облака. " +
+                            "Режим Google добавляет вход и резервную копию в ваш аккаунт.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
                     Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = { showConfig = !showConfig; if (showConfig) onClearError() }, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = { showConfig = !showConfig; if (showConfig) onClearError() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text(if (showConfig) "Скрыть настройку Google-входа" else "Настроить Google-вход")
                     }
 
@@ -238,7 +258,7 @@ fun AuthScreen(
 
             Spacer(Modifier.height(14.dp))
             Text(
-                "Ключи и секреты шифруются ключом устройства. Google-вход настраивается по Client ID в разделе «Оформление».",
+                "Ключи и секреты шифруются ключом устройства. Google-вход настраивается один раз по Client ID.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

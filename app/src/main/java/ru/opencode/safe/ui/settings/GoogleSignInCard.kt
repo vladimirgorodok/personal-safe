@@ -85,7 +85,7 @@ fun GoogleSignInCard(
                     Text("Вход через Google", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     Text(
                         when {
-                            value.isBlank() -> "не настроен — доступен гостевой вход"
+                            value.isBlank() -> "не настроен — доступен локальный режим"
                             looksLikeClientId -> "Client ID задан"
                             else -> "Client ID задан, но формат не похож на Client ID"
                         },

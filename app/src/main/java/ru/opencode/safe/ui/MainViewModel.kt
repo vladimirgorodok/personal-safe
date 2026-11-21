@@ -212,7 +212,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun signInDemo() {
-        data = data.copy(profile = UserProfile(name = "Гость", email = "guest@local", provider = "demo", isDemo = true))
+        data = data.copy(profile = UserProfile(name = "Локальный режим", email = "local@device", provider = "local", isDemo = true))
         persist()
         publish()
         _state.update { it.copy(phase = Phase.READY, authError = null, authLoading = false) }
@@ -230,7 +230,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     authLoading = false,
                     authError = "Client ID не задан.\n\n" +
                         "Разверните «Настроить Google-вход» и вставьте Client ID веб-записи из Google Cloud. " +
-                        "Без него Google не может подтвердить приложение, поэтому остаётся только гостевой вход.",
+                        "Без него Google не может подтвердить приложение, поэтому остаётся только локальный режим.",
                 )
             }
             return

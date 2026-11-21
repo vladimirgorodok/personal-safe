@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lock
@@ -59,10 +60,13 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -161,17 +165,26 @@ fun CategoryAvatar(category: Category, size: Dp = 48.dp) {
         if (hasRealLogo) category.iconFile?.let { name -> dir?.let { File(it, name).absolutePath } } else null
     }
     val bitmap = rememberFileBitmap(path)
-    val shape = RoundedCornerShape(size * 0.32f)
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(shape)
-            .background(seedBrush(category.colorSeed.takeIf { it != 0L } ?: abs(category.name.hashCode()).toLong())),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(bitmap, contentDescription = category.name, contentScale = ContentScale.Crop, modifier = Modifier.size(size))
-        } else {
+    if (bitmap != null) {
+        // Логотип бренда показываем на прозрачном фоне и целиком вписываем в значок:
+        // виден только сам логотип, без подложки и обрезки.
+        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+            Image(
+                bitmap,
+                contentDescription = category.name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(size),
+            )
+        }
+    } else {
+        val shape = RoundedCornerShape(size * 0.32f)
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(shape)
+                .background(seedBrush(category.colorSeed.takeIf { it != 0L } ?: abs(category.name.hashCode()).toLong())),
+            contentAlignment = Alignment.Center,
+        ) {
             Icon(typeIcon(category.type), contentDescription = category.name, tint = Color.White, modifier = Modifier.size(size * 0.5f))
         }
     }
@@ -184,17 +197,25 @@ fun BrandAvatar(name: String, iconFile: String?, seed: Long, size: Dp = 48.dp) {
         iconFile?.let { n -> dir?.let { File(it, n).absolutePath } }
     }
     val bitmap = rememberFileBitmap(path)
-    val shape = RoundedCornerShape(size * 0.32f)
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(shape)
-            .background(seedBrush(seed)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(bitmap, contentDescription = name, contentScale = ContentScale.Crop, modifier = Modifier.size(size))
-        } else {
+    if (bitmap != null) {
+        // Прозрачный фон: виден только сам логотип, полностью вписанный в значок.
+        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+            Image(
+                bitmap,
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(size),
+            )
+        }
+    } else {
+        val shape = RoundedCornerShape(size * 0.32f)
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(shape)
+                .background(seedBrush(seed)),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
                 initialsOf(name),
                 color = Color.White,
@@ -280,7 +301,8 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 
 /**
  * Значение секрета. По умолчанию скрыто маской и только для чтения.
- * Кнопка глаза открывает значение и делает поле редактируемым.
+ * Кнопка глаза открывает значение и делает поле редактируемым, кнопка копирования
+ * доступна всегда и копирует настоящее значение, а не маску.
  */
 @Composable
 fun SecretValueField(
@@ -290,16 +312,18 @@ fun SecretValueField(
     onChange: (String) -> Unit,
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
+    label: String = "Значение",
+    placeholder: String = "Секрет пуст",
 ) {
     OutlinedTextField(
         value = if (revealed) value else mask(value),
-        onValueChange = { if (revealed) onChange(it) },
+        onValueChange = { text -> if (revealed) onChange(text) },
         readOnly = !revealed,
-        label = { Text("Значение") },
-        placeholder = { Text("Секрет пуст") },
+        label = { Text(label) },
+        placeholder = { Text(placeholder) },
         supportingText = {
             Text(
-                if (revealed) "Значение открыто — можно изменить" else "Скрыто. Нажмите на глаз, чтобы показать и изменить",
+                if (revealed) "Открыто — можно изменить и скопировать" else "Скрыто. Нажмите на глаз, чтобы показать и скопировать",
                 style = MaterialTheme.typography.labelSmall,
             )
         },
@@ -308,13 +332,13 @@ fun SecretValueField(
                 IconButton(onClick = { onRevealedChange(!revealed) }) {
                     Icon(
                         if (revealed) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                        if (revealed) "Скрыть" else "Показать и изменить",
+                        if (revealed) "Скрыть" else "Показать",
                     )
                 }
                 IconButton(onClick = onCopy) { Icon(Icons.Rounded.ContentCopy, "Копировать") }
             }
         },
-        minLines = 2,
+        minLines = 1,
         textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
         shape = RoundedCornerShape(16.dp),
         colors = TextFieldDefaults.colors(
@@ -325,6 +349,71 @@ fun SecretValueField(
         ),
         modifier = modifier.fillMaxWidth(),
     )
+}
+
+/**
+ * Крупный счётчик контурным шрифтом: заливка еле заметна, контур — цветом темы.
+ * Используется для числа записей в категории.
+ */
+@Composable
+fun ContourCounter(text: String, modifier: Modifier = Modifier, style: TextStyle? = null) {
+    val base = style ?: MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
+    val density = LocalDensity.current
+    val fill = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)
+    val stroke = MaterialTheme.colorScheme.primary
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(text, style = base.copy(color = fill), maxLines = 1)
+        Text(
+            text,
+            style = base.copy(
+                color = stroke,
+                drawStyle = Stroke(width = with(density) { 1.4.dp.toPx() }, join = StrokeJoin.Round),
+            ),
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * Сворачиваемая секция: заголовок всегда виден, содержимое — по нажатию.
+ * Нужна там, где настроек много и они мешают: темы, прозрачность, провайдер ИИ.
+ */
+@Composable
+fun CollapsibleSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    initiallyExpanded: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
+    GlassCard(modifier = modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    if (!subtitle.isNullOrBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Icon(
+                    Icons.Rounded.ExpandMore,
+                    if (expanded) "Свернуть" else "Развернуть",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(if (expanded) 180f else 0f),
+                )
+            }
+            AnimatedVisibility(visible = expanded) { Column { content() } }
+        }
+    }
 }
 
 fun mask(value: String): String {

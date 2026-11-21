@@ -6,24 +6,40 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
+    <!-- основа: глубокий сине-фиолетовый градиент -->
     <path android:pathData="M0,0 h108 v108 h-108 z">
         <aapt:attr name="android:fillColor">
             <gradient
                 android:type="linear"
                 android:startX="0" android:startY="0"
                 android:endX="108" android:endY="108">
-                <item android:offset="0.0" android:color="#0A1030" />
-                <item android:offset="0.5" android:color="#191056" />
-                <item android:offset="1.0" android:color="#2E1358" />
+                <item android:offset="0.0" android:color="#FF080C2A" />
+                <item android:offset="0.42" android:color="#FF1A1160" />
+                <item android:offset="0.74" android:color="#FF2C1373" />
+                <item android:offset="1.0" android:color="#FF0D2A66" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- стеклянные блики фона -->
+    <!-- мягкое цветное свечение в центре -->
+    <path android:pathData="M54,52 m-62,0 a62,62 0 1,0 124,0 a62,62 0 1,0 -124,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="54" android:centerY="52"
+                android:gradientRadius="64">
+                <item android:offset="0.0" android:color="#598D6BFF" />
+                <item android:offset="0.5" android:color="#2655C8FF" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- диагональные стеклянные блики -->
     <path
-        android:pathData="M-10,10 L40,-10 L70,120 L10,120 Z"
-        android:fillColor="#1AFFFFFF" />
+        android:pathData="M-14,28 L32,-14 L62,120 L16,120 Z"
+        android:fillColor="#16FFFFFF" />
     <path
-        android:pathData="M70,-10 L110,20 L110,120 L80,120 Z"
-        android:fillColor="#12FFFFFF" />
+        android:pathData="M62,-14 L108,16 L108,120 L84,120 Z"
+        android:fillColor="#0FFFFFFF" />
 </vector>

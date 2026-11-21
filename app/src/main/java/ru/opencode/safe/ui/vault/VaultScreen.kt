@@ -60,6 +60,7 @@ import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.ui.components.BrandAvatar
 import ru.opencode.safe.ui.components.Appear
 import ru.opencode.safe.ui.components.CategoryAvatar
+import ru.opencode.safe.ui.components.ContourCounter
 import ru.opencode.safe.ui.components.EmptyState
 import ru.opencode.safe.ui.components.GlassCard
 import ru.opencode.safe.ui.components.ProfileAvatar
@@ -298,12 +299,19 @@ private fun SearchBar(query: String, onQuery: (String) -> Unit) {
 @Composable
 private fun CategoryCard(category: Category, count: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     GlassCard(modifier = modifier, onClick = onClick) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            CategoryAvatar(category, 44.dp)
-            Spacer(Modifier.height(10.dp))
-            Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            Text("$count", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            CategoryAvatar(category, 40.dp)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                category.name,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(6.dp))
+            ContourCounter("$count")
         }
     }
 }

@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.settings.DarkMode
 import ru.opencode.safe.data.settings.DisplaySettings
-import ru.opencode.safe.ui.GoogleSupport
+import ru.opencode.safe.ui.components.CollapsibleSection
 import ru.opencode.safe.ui.components.GlassCard
 import ru.opencode.safe.ui.components.SafeTopBar
 import ru.opencode.safe.ui.components.SectionTitle
@@ -47,36 +47,39 @@ import kotlin.math.roundToInt
 @Composable
 fun AppearanceScreen(
     display: DisplaySettings,
-    signatureSha1: String?,
-    packageName: String,
-    support: GoogleSupport?,
     onBack: () -> Unit,
     onTheme: (String) -> Unit,
     onDarkMode: (DarkMode) -> Unit,
     onDynamic: (Boolean) -> Unit,
     onGlass: (Boolean) -> Unit,
-    onClientId: (String) -> Unit,
     onCardOpacity: (Float) -> Unit,
     onBackgroundOpacity: (Float) -> Unit,
     onBorderOpacity: (Float) -> Unit,
-    onOpenLink: (String) -> Unit,
-    onCopy: (String) -> Unit,
 ) {
+    val currentTheme = ThemeSets.all.firstOrNull { it.id == display.themeSetId }?.name ?: display.themeSetId
+
     Scaffold(containerColor = Color.Transparent) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item { SafeTopBar("Оформление", onBack = onBack, subtitle = "Темы, прозрачность и вход") }
+            item { SafeTopBar("Оформление", onBack = onBack, subtitle = "Темы и прозрачность") }
 
-            item { SectionTitle("Набор тем", Modifier.padding(top = 6.dp)) }
-            items(ThemeSets.all.size) { index ->
-                val set = ThemeSets.all[index]
-                ThemeCard(set, selected = set.id == display.themeSetId) { onTheme(set.id) }
+            item {
+                CollapsibleSection(title = "Набор тем", subtitle = "Сейчас: $currentTheme") {
+                    Column(
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ThemeSets.all.forEach { set ->
+                            ThemeCard(set, selected = set.id == display.themeSetId) { onTheme(set.id) }
+                        }
+                    }
+                }
             }
 
-            item { SectionTitle("Режим", Modifier.padding(top = 12.dp)) }
+            item { SectionTitle("Режим", Modifier.padding(top = 6.dp)) }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DarkMode.entries.forEach { mode ->
@@ -89,9 +92,12 @@ fun AppearanceScreen(
                 }
             }
 
-            item { SectionTitle("Прозрачность элементов", Modifier.padding(top = 12.dp)) }
             item {
-                GlassCard(modifier = Modifier.fillMaxWidth()) {
+                CollapsibleSection(
+                    title = "Прозрачность элементов",
+                    subtitle = "Карточки, фон и рамки",
+                    modifier = Modifier.padding(top = 6.dp),
+                ) {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         OpacitySlider("Карточки", display.cardOpacity, onCardOpacity)
                         OpacitySlider("Фон", display.backgroundOpacity, onBackgroundOpacity)
@@ -100,7 +106,7 @@ fun AppearanceScreen(
                 }
             }
 
-            item { SectionTitle("Дополнительно", Modifier.padding(top = 12.dp)) }
+            item { SectionTitle("Дополнительно", Modifier.padding(top = 6.dp)) }
             item {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column {
@@ -108,19 +114,6 @@ fun AppearanceScreen(
                         SwitchLine("Стеклянные эффекты", display.glassEffects, onGlass)
                     }
                 }
-            }
-
-            item { SectionTitle("Google-вход", Modifier.padding(top = 12.dp)) }
-            item {
-                GoogleSignInCard(
-                    value = display.googleClientId,
-                    onValueChange = onClientId,
-                    packageName = packageName,
-                    signatureSha1 = signatureSha1,
-                    support = support,
-                    onCopy = onCopy,
-                    onOpenLink = onOpenLink,
-                )
             }
         }
     }

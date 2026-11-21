@@ -301,26 +301,19 @@ private fun ReadyContent(
                 onGlass = viewModel::setGlassEffects,
                 onAiSuggest = viewModel::setAiSuggest,
                 onBiometric = onBiometric,
-                onRememberSignIn = viewModel::setRememberSignIn,
                 onSignOut = { viewModel.signOut(); nav.resetTo(Screen.Vault) },
             )
 
             Screen.Appearance -> AppearanceScreen(
                 display = state.display,
-                signatureSha1 = signatureSha1,
-                packageName = context.packageName,
-                support = googleSupport,
                 onBack = { nav.pop() },
                 onTheme = viewModel::setThemeSet,
                 onDarkMode = viewModel::setDarkMode,
                 onDynamic = viewModel::setDynamicColor,
                 onGlass = viewModel::setGlassEffects,
-                onClientId = viewModel::setGoogleClientId,
                 onCardOpacity = viewModel::setCardOpacity,
                 onBackgroundOpacity = viewModel::setBackgroundOpacity,
                 onBorderOpacity = viewModel::setBorderOpacity,
-                onOpenLink = onOpenLink,
-                onCopy = onCopy,
             )
 
             Screen.AiSettings -> AiSettingsScreen(
@@ -329,6 +322,7 @@ private fun ReadyContent(
                 onSave = { viewModel.saveAiConfig(it); viewModel.showToast("Настройки агента сохранены") },
                 onTest = { viewModel.testAiConfig(it) {} },
                 onLoadModels = { config, callback -> viewModel.loadModels(config, callback) },
+                onOpenLink = onOpenLink,
             )
 
             Screen.Backup -> BackupScreen(

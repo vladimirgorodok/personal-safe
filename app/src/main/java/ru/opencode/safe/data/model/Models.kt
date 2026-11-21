@@ -2,6 +2,7 @@ package ru.opencode.safe.data.model
 
 import org.json.JSONArray
 import org.json.JSONObject
+import ru.opencode.safe.data.ai.AiDefaults
 import java.util.UUID
 
 /** Тип секрета: определяет категорию по умолчанию и способ отображения. */
@@ -44,6 +45,13 @@ data class Category(
 
 data class SecretLink(val title: String, val url: String)
 
+/**
+ * Дополнительное поле секрета: подпись и значение. Нужно, когда в одной записи лежит
+ * несколько важных значений (например, скриншот с логином, паролем и кодом восстановления).
+ * Значение по умолчанию скрыто маской и открывается глазом.
+ */
+data class SecretField(val label: String = "", val value: String = "")
+
 data class Secret(
     val id: String = UUID.randomUUID().toString(),
     val categoryId: String,
@@ -53,6 +61,8 @@ data class Secret(
     val value: String,
     val description: String = "",
     val note: String = "",
+    /** Дополнительные скрытые значения внутри одной записи. */
+    val fields: List<SecretField> = emptyList(),
     val imageUrl: String? = null,
     val brandDomain: String? = null,
     /** Подробное описание, которое агент нашёл в интернете. */
@@ -66,11 +76,11 @@ data class Secret(
 )
 
 data class AiConfig(
-    val providerId: String = "aitunnel",
-    val providerName: String = "aitunnel",
-    val baseUrl: String = "https://api.aitunnel.ru/v1",
+    val providerId: String = AiDefaults.PROVIDER_ID,
+    val providerName: String = AiDefaults.PROVIDER_NAME,
+    val baseUrl: String = AiDefaults.BASE_URL,
     val apiKey: String = "",
-    val model: String = "gpt-4o-mini",
+    val model: String = AiDefaults.MODEL,
     val visionModel: String = "",
     val temperature: Double = 0.2,
     val enabled: Boolean = true,
@@ -154,6 +164,9 @@ fun secretToJson(s: Secret): JSONObject = JSONObject().apply {
     put("value", s.value)
     put("description", s.description)
     put("note", s.note)
+    put("fields", JSONArray().apply {
+        s.fields.forEach { put(JSONObject().put("label", it.label).put("value", it.value)) }
+    })
     s.imageUrl?.let { put("imageUrl", it) }
     s.brandDomain?.let { put("brandDomain", it) }
     put("detailedInfo", s.detailedInfo)
@@ -175,6 +188,9 @@ fun secretFromJson(o: JSONObject): Secret = Secret(
     value = o.optString("value"),
     description = o.optString("description"),
     note = o.optString("note"),
+    fields = o.optJSONArray("fields").mapObj {
+        SecretField(it.optString("label"), it.optString("value"))
+    },
     imageUrl = o.optString("imageUrl").ifBlank { null },
     brandDomain = o.optString("brandDomain").ifBlank { null },
     detailedInfo = o.optString("detailedInfo"),
@@ -200,11 +216,11 @@ fun aiToJson(a: AiConfig): JSONObject = JSONObject().apply {
 }
 
 fun aiFromJson(o: JSONObject): AiConfig = AiConfig(
-    providerId = o.optString("providerId", "aitunnel"),
-    providerName = o.optString("providerName", "aitunnel"),
-    baseUrl = o.optString("baseUrl", "https://api.aitunnel.ru/v1"),
+    providerId = o.optString("providerId", AiDefaults.PROVIDER_ID),
+    providerName = o.optString("providerName", AiDefaults.PROVIDER_NAME),
+    baseUrl = o.optString("baseUrl", AiDefaults.BASE_URL),
     apiKey = o.optString("apiKey"),
-    model = o.optString("model", "gpt-4o-mini"),
+    model = o.optString("model", AiDefaults.MODEL),
     visionModel = o.optString("visionModel"),
     temperature = o.optDouble("temperature", 0.2),
     enabled = o.optBoolean("enabled", true),
