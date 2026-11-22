@@ -239,7 +239,7 @@ private fun ReadyContent(
             Screen.Analyze -> AnalyzeScreen(
                 state = analyzeState,
                 categories = state.categories,
-                aiConfigured = state.ai.isConfigured && state.ai.enabled,
+                ai = state.ai,
                 autoPaste = true,
                 onInput = viewModel::setAnalyzeInput,
                 onPasteClipboard = { viewModel.readClipboard(context) },
@@ -255,6 +255,11 @@ private fun ReadyContent(
                 onOpenLink = onOpenLink,
                 onCopy = onCopy,
                 onOpenAiSettings = { nav.push(Screen.AiSettings) },
+                onLoadModels = { callback -> viewModel.loadModels(state.ai, callback) },
+                onPickModel = { model ->
+                    viewModel.saveAiConfig(state.ai.copy(model = model))
+                    viewModel.showToast("Модель: $model")
+                },
                 onBack = { nav.pop() },
             )
 

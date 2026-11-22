@@ -3,7 +3,6 @@ package ru.opencode.safe.ui.settings
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,12 +22,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -62,6 +57,7 @@ import ru.opencode.safe.data.ai.AiKeyFormat
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.ui.components.CollapsibleSection
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.components.ModelPickerDialog
 import ru.opencode.safe.ui.components.SafeTopBar
 
 private data class ProviderPreset(
@@ -421,103 +417,6 @@ private fun SetupStep(number: String, text: String) {
         Spacer(Modifier.width(10.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium)
     }
-}
-
-/**
- * Выбор модели из списка провайдера. Список бывает длинным, поэтому есть поиск, фильтр
- * «с картинками» и выбор нажатием (текущая модель помечена галочкой).
- */
-@Composable
-private fun ModelPickerDialog(
-    models: List<String>,
-    selected: String,
-    onPick: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    var onlyVision by remember { mutableStateOf(false) }
-    val filtered = remember(models, query, onlyVision) {
-        models
-            .filter { !onlyVision || AiKeyFormat.looksLikeVisionModel(it) }
-            .filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Модели провайдера") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Поиск модели") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = fieldColors(),
-                )
-                Spacer(Modifier.height(8.dp))
-                FilterChip(
-                    selected = onlyVision,
-                    onClick = { onlyVision = !onlyVision },
-                    label = { Text("С картинками") },
-                    leadingIcon = { Icon(Icons.Rounded.Image, null, modifier = Modifier.size(16.dp)) },
-                )
-                Spacer(Modifier.height(8.dp))
-                if (filtered.isEmpty()) {
-                    Text(
-                        if (models.isEmpty()) "Список пуст" else "Ничего не найдено",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
-                        items(filtered.size) { index ->
-                            val id = filtered[index]
-                            val isSelected = id.equals(selected, ignoreCase = true)
-                            val vision = AiKeyFormat.looksLikeVisionModel(id)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onPick(id) }
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                        else Color.Transparent
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (vision) {
-                                    Icon(
-                                        Icons.Rounded.Image,
-                                        "Распознаёт изображения",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                Text(
-                                    id,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                )
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Rounded.Check,
-                                        "Выбрано",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } },
-    )
 }
 
 /** Достаёт из буфера значение, похожее на API-ключ. Иначе null. */

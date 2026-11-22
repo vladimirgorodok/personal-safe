@@ -27,11 +27,11 @@ import androidx.compose.material.icons.rounded.AttachFile
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -60,11 +60,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.ai.AgentSource
+import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.ui.AnalyzeState
 import ru.opencode.safe.ui.components.CategoryAvatar
 import ru.opencode.safe.ui.components.DetailExpander
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.ui.components.ModelPickerDialog
 import ru.opencode.safe.ui.components.SafeTopBar
 import ru.opencode.safe.ui.components.TypeBadge
 
@@ -72,7 +74,7 @@ import ru.opencode.safe.ui.components.TypeBadge
 fun AnalyzeScreen(
     state: AnalyzeState,
     categories: List<Category>,
-    aiConfigured: Boolean,
+    ai: AiConfig,
     autoPaste: Boolean,
     onInput: (String) -> Unit,
     onPasteClipboard: () -> Unit,
@@ -84,10 +86,32 @@ fun AnalyzeScreen(
     onOpenLink: (String) -> Unit,
     onCopy: (String) -> Unit,
     onOpenAiSettings: () -> Unit,
+    onLoadModels: ((Result<List<String>>) -> Unit) -> Unit,
+    onPickModel: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let(onPickedUri)
+    }
+
+    val aiConfigured = ai.isConfigured && ai.enabled
+    var showPicker by remember { mutableStateOf(false) }
+    var models by remember { mutableStateOf<List<String>?>(null) }
+    var modelsLoading by remember { mutableStateOf(false) }
+    var modelsError by remember { mutableStateOf<String?>(null) }
+
+    fun openModelPicker() {
+        showPicker = true
+        if (models == null && !modelsLoading) {
+            modelsLoading = true
+            modelsError = null
+            onLoadModels { result ->
+                modelsLoading = false
+                result
+                    .onSuccess { models = it }
+                    .onFailure { modelsError = it.message ?: "Не удалось получить список" }
+            }
+        }
     }
 
     val hasData = state.input.isNotBlank() || state.images.isNotEmpty() ||
@@ -125,13 +149,49 @@ fun AnalyzeScreen(
             }
 
             item {
-                AssistChip(
-                    onClick = onOpenAiSettings,
-                    leadingIcon = { Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(16.dp)) },
-                    label = {
-                        Text(if (aiConfigured) "ИИ-агент подключён" else "ИИ не настроен — офлайн-режим")
-                    },
-                )
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { if (aiConfigured) openModelPicker() else onOpenAiSettings() },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Rounded.AutoAwesome,
+                            null,
+                            tint = if (aiConfigured) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (aiConfigured) "Модель ИИ" else "ИИ не настроен",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                if (aiConfigured) {
+                                    val provider = ai.providerName.ifBlank { "Провайдер" }
+                                    val modelName = ai.model.ifBlank { "модель не выбрана" }
+                                    "$provider · $modelName"
+                                } else {
+                                    "Офлайн-режим — нажмите, чтобы подключить"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Rounded.ArrowDropDown,
+                            if (aiConfigured) "Сменить модель" else "Настроить ИИ",
+                        )
+                    }
+                }
             }
 
             item {
@@ -356,6 +416,21 @@ fun AnalyzeScreen(
                 }
             }
         }
+    }
+
+    if (showPicker) {
+        ModelPickerDialog(
+            models = models.orEmpty(),
+            selected = ai.model,
+            loading = modelsLoading,
+            error = modelsError,
+            onPick = { id ->
+                onPickModel(id)
+                showPicker = false
+            },
+            onDismiss = { showPicker = false },
+            onOpenSettings = onOpenAiSettings,
+        )
     }
 }
 

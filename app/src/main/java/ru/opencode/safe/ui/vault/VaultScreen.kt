@@ -299,19 +299,20 @@ private fun SearchBar(query: String, onQuery: (String) -> Unit) {
 @Composable
 private fun CategoryCard(category: Category, count: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     GlassCard(modifier = modifier, onClick = onClick) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            CategoryAvatar(category, 40.dp)
-            Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryAvatar(category, 40.dp)
+                Spacer(Modifier.width(10.dp))
+                ContourCounter("$count")
+            }
+            Spacer(Modifier.height(6.dp))
             Text(
                 category.name,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(6.dp))
-            ContourCounter("$count")
         }
     }
 }
