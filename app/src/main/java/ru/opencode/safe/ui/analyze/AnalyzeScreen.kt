@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.ai.AgentSource
+import ru.opencode.safe.data.ai.AiProviders
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.ui.AnalyzeState
@@ -86,8 +87,8 @@ fun AnalyzeScreen(
     onOpenLink: (String) -> Unit,
     onCopy: (String) -> Unit,
     onOpenAiSettings: () -> Unit,
-    onLoadModels: ((Result<List<String>>) -> Unit) -> Unit,
-    onPickModel: (String) -> Unit,
+    onLoadModels: (AiConfig, (Result<List<String>>) -> Unit) -> Unit,
+    onApplyAi: (AiConfig) -> Unit,
     onBack: () -> Unit,
 ) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -96,22 +97,27 @@ fun AnalyzeScreen(
 
     val aiConfigured = ai.isConfigured && ai.enabled
     var showPicker by remember { mutableStateOf(false) }
+    var dialogProviderId by remember(showPicker) { mutableStateOf(ai.providerId) }
     var models by remember { mutableStateOf<List<String>?>(null) }
     var modelsLoading by remember { mutableStateOf(false) }
     var modelsError by remember { mutableStateOf<String?>(null) }
 
-    fun openModelPicker() {
-        showPicker = true
-        if (models == null && !modelsLoading) {
-            modelsLoading = true
-            modelsError = null
-            onLoadModels { result ->
-                modelsLoading = false
-                result
-                    .onSuccess { models = it }
-                    .onFailure { modelsError = it.message ?: "Не удалось получить список" }
-            }
+    fun loadModelsFor(providerId: String) {
+        val candidate = AiProviders.switchTo(ai, providerId)
+        models = null
+        modelsError = null
+        modelsLoading = true
+        onLoadModels(candidate) { result ->
+            modelsLoading = false
+            result
+                .onSuccess { models = it }
+                .onFailure { modelsError = it.message ?: "Не удалось получить список" }
         }
+    }
+
+    fun openPicker() {
+        showPicker = true
+        if (models == null && !modelsLoading) loadModelsFor(dialogProviderId)
     }
 
     val hasData = state.input.isNotBlank() || state.images.isNotEmpty() ||
@@ -151,7 +157,7 @@ fun AnalyzeScreen(
             item {
                 GlassCard(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { if (aiConfigured) openModelPicker() else onOpenAiSettings() },
+                    onClick = { if (aiConfigured) openPicker() else onOpenAiSettings() },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -173,9 +179,7 @@ fun AnalyzeScreen(
                             )
                             Text(
                                 if (aiConfigured) {
-                                    val provider = ai.providerName.ifBlank { "Провайдер" }
-                                    val modelName = ai.model.ifBlank { "модель не выбрана" }
-                                    "$provider · $modelName"
+                                    "${AiProviders.displayName(ai)} · ${ai.model.ifBlank { "модель не выбрана" }}"
                                 } else {
                                     "Офлайн-режим — нажмите, чтобы подключить"
                                 },
@@ -419,13 +423,25 @@ fun AnalyzeScreen(
     }
 
     if (showPicker) {
+        val pickerConfig = AiProviders.switchTo(ai, dialogProviderId)
         ModelPickerDialog(
             models = models.orEmpty(),
-            selected = ai.model,
+            selected = pickerConfig.model,
+            title = "Провайдер и модель",
             loading = modelsLoading,
             error = modelsError,
+            providers = AiProviders.options(ai),
+            selectedProviderId = dialogProviderId,
+            onPickProvider = { id ->
+                if (id != dialogProviderId) {
+                    dialogProviderId = id
+                    // Сразу применяем провайдера: его адрес, модель по умолчанию и сохранённый ключ.
+                    onApplyAi(AiProviders.switchTo(ai, id))
+                    loadModelsFor(id)
+                }
+            },
             onPick = { id ->
-                onPickModel(id)
+                onApplyAi(AiProviders.withModel(pickerConfig, id))
                 showPicker = false
             },
             onDismiss = { showPicker = false },

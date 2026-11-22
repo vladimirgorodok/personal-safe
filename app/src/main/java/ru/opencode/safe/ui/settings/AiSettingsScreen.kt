@@ -57,50 +57,9 @@ import ru.opencode.safe.data.ai.AiKeyFormat
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.ui.components.CollapsibleSection
 import ru.opencode.safe.ui.components.GlassCard
+import ru.opencode.safe.data.ai.AiProviders
 import ru.opencode.safe.ui.components.ModelPickerDialog
 import ru.opencode.safe.ui.components.SafeTopBar
-
-private data class ProviderPreset(
-    val id: String,
-    val name: String,
-    val baseUrl: String,
-    val model: String,
-    /** Где взять ключ. Пусто — ссылку не показываем. */
-    val keysUrl: String = "",
-    /** Что важно знать про бесплатный тариф. */
-    val freeHint: String = "",
-)
-
-private val presets = listOf(
-    ProviderPreset(
-        id = AiDefaults.PROVIDER_ID,
-        name = "Groq — бесплатно",
-        baseUrl = AiDefaults.BASE_URL,
-        model = AiDefaults.MODEL,
-        keysUrl = AiDefaults.KEYS_URL,
-        freeHint = "Ключ бесплатный и без карты: 1000 запросов в сутки, есть модели с картинками.",
-    ),
-    ProviderPreset(
-        "openrouter", "OpenRouter",
-        "https://openrouter.ai/api/v1", "google/gemma-4-31b-it:free",
-        keysUrl = "https://openrouter.ai/keys",
-        freeHint = "Бесплатные модели помечены «:free». Суточный лимит обновляется в 03:00 по Москве.",
-    ),
-    ProviderPreset(
-        "gemini", "Google Gemini",
-        "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-4-hydrogen",
-        keysUrl = "https://aistudio.google.com/app/apikey",
-        freeHint = "Бесплатный тариф без карты, лимиты смотрите в AI Studio. Данные могут использоваться Google.",
-    ),
-    ProviderPreset("aitunnel", "aitunnel", "https://api.aitunnel.ru/v1", "gpt-4o-mini"),
-    ProviderPreset(
-        "openai", "OpenAI",
-        "https://api.openai.com/v1", "gpt-4o-mini",
-        keysUrl = "https://platform.openai.com/api-keys",
-        freeHint = "Платный провайдер: ключ и оплата — на стороне OpenAI.",
-    ),
-    ProviderPreset("custom", "Другой", "", ""),
-)
 
 @Composable
 fun AiSettingsScreen(
@@ -118,6 +77,7 @@ fun AiSettingsScreen(
     var visionModel by remember(config.visionModel) { mutableStateOf(config.visionModel) }
     var temperature by remember(config.temperature) { mutableStateOf(config.temperature.toFloat()) }
     var enabled by remember(config.enabled) { mutableStateOf(config.enabled) }
+    var apiKeys by remember(config.apiKeys) { mutableStateOf(config.apiKeys) }
     var showKey by remember { mutableStateOf(false) }
     var loadingModels by remember { mutableStateOf(false) }
     var models by remember { mutableStateOf<List<String>?>(null) }
@@ -126,7 +86,7 @@ fun AiSettingsScreen(
     var clipboardCandidate by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
-    val preset = presets.firstOrNull { it.id == providerId }
+    val preset = AiProviders.byId(providerId)
     val presetKeysUrl = preset?.keysUrl.orEmpty()
 
     // Если ключа ещё нет, но в буфере лежит что-то похожее на ключ — предлагаем вставить.
@@ -154,6 +114,7 @@ fun AiSettingsScreen(
         visionModel = visionModel.trim(),
         temperature = temperature.toDouble(),
         enabled = enabled,
+        apiKeys = apiKeys,
     )
 
     Scaffold(
@@ -204,15 +165,16 @@ fun AiSettingsScreen(
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            presets.forEach { item ->
+                            AiProviders.all.forEach { item ->
                                 FilterChip(
                                     selected = providerId == item.id,
                                     onClick = {
-                                        providerId = item.id
-                                        if (item.id != "custom") {
-                                            baseUrl = item.baseUrl
-                                            model = item.model
-                                        }
+                                        val next = AiProviders.switchTo(current(), item.id)
+                                        providerId = next.providerId
+                                        baseUrl = next.baseUrl
+                                        model = next.model
+                                        apiKey = next.apiKey
+                                        apiKeys = next.apiKeys
                                     },
                                     label = { Text(item.name) },
                                 )

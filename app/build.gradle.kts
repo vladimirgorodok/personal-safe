@@ -28,8 +28,8 @@ android {
         applicationId = "ru.opencode.safe"
         minSdk = 26
         targetSdk = 34
-        versionCode = 22
-        versionName = "2.11"
+        versionCode = 23
+        versionName = "2.12"
         vectorDrawables { useSupportLibrary = true }
         buildConfigField("String", "GOOGLE_CLIENT_ID", "\"$googleClientId\"")
     }

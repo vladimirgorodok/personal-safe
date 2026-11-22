@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import ru.opencode.safe.SafeApp
 import ru.opencode.safe.ui.analyze.AnalyzeScreen
 import ru.opencode.safe.ui.auth.AuthScreen
+import ru.opencode.safe.data.ai.AiProviders
 import ru.opencode.safe.ui.auth.LockScreen
 import ru.opencode.safe.ui.components.LocalIconDir
 import ru.opencode.safe.ui.nav.Navigator
@@ -255,10 +256,10 @@ private fun ReadyContent(
                 onOpenLink = onOpenLink,
                 onCopy = onCopy,
                 onOpenAiSettings = { nav.push(Screen.AiSettings) },
-                onLoadModels = { callback -> viewModel.loadModels(state.ai, callback) },
-                onPickModel = { model ->
-                    viewModel.saveAiConfig(state.ai.copy(model = model))
-                    viewModel.showToast("Модель: $model")
+                onLoadModels = { config, callback -> viewModel.loadModels(config, callback) },
+                onApplyAi = { config ->
+                    viewModel.saveAiConfig(config)
+                    viewModel.showToast("${AiProviders.displayName(config)} · ${config.model}")
                 },
                 onBack = { nav.pop() },
             )

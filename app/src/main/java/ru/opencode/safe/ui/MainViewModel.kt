@@ -24,6 +24,7 @@ import ru.opencode.safe.SafeApp
 import ru.opencode.safe.data.ai.AgentInput
 import ru.opencode.safe.data.ai.AgentResult
 import ru.opencode.safe.data.ai.AgentSource
+import ru.opencode.safe.data.ai.AiProviders
 import ru.opencode.safe.data.ai.BrandCatalog
 import ru.opencode.safe.data.ai.Heuristics
 import ru.opencode.safe.data.backup.BackupCrypto
@@ -682,7 +683,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------------- ИИ-настройки ----------------
 
     fun saveAiConfig(config: AiConfig) {
-        data = data.copy(ai = config)
+        data = data.copy(ai = AiProviders.normalized(config))
         persist()
         publish()
     }

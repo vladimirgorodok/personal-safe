@@ -84,6 +84,8 @@ data class AiConfig(
     val visionModel: String = "",
     val temperature: Double = 0.2,
     val enabled: Boolean = true,
+    /** Ключи по провайдерам: переключение провайдера не заставляет вводить ключ заново. */
+    val apiKeys: Map<String, String> = emptyMap(),
 ) {
     val isConfigured: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank()
     val effectiveVisionModel: String get() = visionModel.ifBlank { model }
@@ -213,6 +215,7 @@ fun aiToJson(a: AiConfig): JSONObject = JSONObject().apply {
     put("visionModel", a.visionModel)
     put("temperature", a.temperature)
     put("enabled", a.enabled)
+    put("apiKeys", JSONObject().apply { a.apiKeys.forEach { (k, v) -> put(k, v) } })
 }
 
 fun aiFromJson(o: JSONObject): AiConfig = AiConfig(
@@ -224,6 +227,9 @@ fun aiFromJson(o: JSONObject): AiConfig = AiConfig(
     visionModel = o.optString("visionModel"),
     temperature = o.optDouble("temperature", 0.2),
     enabled = o.optBoolean("enabled", true),
+    apiKeys = o.optJSONObject("apiKeys")?.let { obj ->
+        buildMap { obj.keys().forEach { key -> obj.optString(key).ifBlank { null }?.let { put(key, it) } } }
+    } ?: emptyMap(),
 )
 
 fun profileToJson(p: UserProfile): JSONObject = JSONObject().apply {
