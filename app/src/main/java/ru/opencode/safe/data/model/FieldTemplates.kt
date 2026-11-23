@@ -79,4 +79,35 @@ object FieldTemplates {
         }
         return "+$count $word"
     }
+
+    /** Список подписей по типам — подсказка для модели, чтобы она возвращала те же названия полей. */
+    fun promptCatalog(): String =
+        templates.entries.joinToString("\n") { (type, labels) -> "${type.name}: ${labels.joinToString(", ")}" }
+
+    /**
+     * Собирает поля записи: значения, найденные агентом, подставляются в типовые подписи
+     * (остальные подписи остаются пустыми — их заполнит пользователь), а незнакомые поля
+     * агента добавляются в конец. Порядок и названия берём из шаблона, чтобы список не «плыл».
+     */
+    fun merge(type: CategoryType, fromAgent: List<SecretField>): List<SecretField> {
+        val labels = labels(type)
+        val agent = fromAgent.filter { it.value.isNotBlank() }
+        // Подпись от модели приводим к подписи шаблона: «CVV» → «CVV/CVC», «Срок» → «Срок действия».
+        val aligned = agent.mapNotNull { field -> align(field.label, labels)?.let { field.copy(label = it) } }
+        val byLabel = aligned.associateBy { it.label.lowercase() }
+        val fromTemplate = labels.map { byLabel[it.lowercase()] ?: SecretField(label = it) }
+        val extra = agent.filter { align(it.label, labels) == null }
+        return fromTemplate + extra
+    }
+
+    /** Подпись шаблона, которой соответствует подпись агента; null — поле незнакомое. */
+    private fun align(label: String, template: List<String>): String? {
+        val short = label.trim().lowercase()
+        if (short.isBlank()) return null
+        return template.firstOrNull { it.equals(label.trim(), ignoreCase = true) }
+            ?: template.firstOrNull { candidate ->
+                val full = candidate.lowercase()
+                full.contains(short) || short.contains(full.substringBefore('/').trim())
+            }
+    }
 }

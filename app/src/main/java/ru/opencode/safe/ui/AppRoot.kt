@@ -248,8 +248,8 @@ private fun ReadyContent(
                 onClearAttachments = viewModel::clearAttachments,
                 onClear = viewModel::resetAnalyze,
                 onRun = viewModel::runAnalyze,
-                onSave = { categoryId, newName ->
-                    viewModel.saveAnalyzedResult(categoryId, newName)
+                onSave = { categoryId, newName, fields ->
+                    viewModel.saveAnalyzedResult(categoryId, newName, fields)
                     viewModel.resetAnalyze()
                     nav.resetTo(Screen.Vault)
                 },

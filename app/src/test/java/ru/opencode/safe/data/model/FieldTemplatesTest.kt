@@ -53,8 +53,7 @@ class FieldTemplatesTest {
     }
 
     @Test
-    fun filledSummaryCountsOnlyFilledFields() {
-        assertNull(FieldTemplates.filledSummary(emptyList()))
+    fun filledSummaryCountsOnlyFilledFields() {        assertNull(FieldTemplates.filledSummary(emptyList()))
         assertNull(FieldTemplates.filledSummary(listOf(SecretField("PIN"))))
         assertEquals("+1 значение", FieldTemplates.filledSummary(listOf(SecretField("PIN", "1234"))))
         assertEquals(
@@ -65,5 +64,29 @@ class FieldTemplatesTest {
         )
         assertEquals("+5 значений", FieldTemplates.filledSummary(List(5) { SecretField("f$it", "v") }))
         assertEquals("+11 значений", FieldTemplates.filledSummary(List(11) { SecretField("f$it", "v") }))
+    }
+
+    @Test
+    fun mergePutsAgentValuesIntoTemplateLabels() {
+        val agent = listOf(SecretField("CVV", "123"), SecretField("Срок действия", "12/28"))
+        val merged = FieldTemplates.merge(CategoryType.BANK_CARD, agent)
+        val map = merged.associate { it.label to it.value }
+
+        // Порядок и подписи — из шаблона, значения — от агента.
+        assertEquals(FieldTemplates.labels(CategoryType.BANK_CARD), merged.map { it.label })
+        assertEquals("12/28", map["Срок действия"])
+        assertEquals("123", map["CVV/CVC"])
+        assertEquals("", map["PIN"])
+    }
+
+    @Test
+    fun mergeKeepsUnknownAgentFieldsAtTheEnd() {
+        val merged = FieldTemplates.merge(
+            CategoryType.BANK_CARD,
+            listOf(SecretField("Кэшбэк", "5%"), SecretField("PIN", "")),
+        )
+        assertEquals("Кэшбэк", merged.last().label)
+        assertEquals("5%", merged.last().value)
+        assertFalse(merged.any { it.label == "PIN" && it.value.isNotBlank() })
     }
 }

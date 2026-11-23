@@ -6,6 +6,8 @@ import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
 import ru.opencode.safe.data.model.Defaults
+import ru.opencode.safe.data.model.FieldTemplates
+import ru.opencode.safe.data.model.SecretField
 import ru.opencode.safe.data.model.SecretLink
 
 enum class AgentSource { AI, LOCAL }
@@ -33,6 +35,8 @@ data class AgentResult(
     val confidence: Float,
     val source: AgentSource,
     val warnings: List<String> = emptyList(),
+    /** Значения дополнительных полей, найденные агентом (срок карты, CVV, кем выдан и т.п.). */
+    val fields: List<SecretField> = emptyList(),
 )
 
 /**
@@ -81,7 +85,9 @@ class AgentAnalyzer(private val model: ChatModel) {
     private fun buildSystemPrompt(categories: List<Category>): String {
         val existing = if (categories.isEmpty()) "нет"
         else categories.joinToString("; ") { "${it.id}=${it.name}(${it.type.name})" }
-        return PROMPT_TEMPLATE.replace("{CATEGORIES}", existing)
+        return PROMPT_TEMPLATE
+            .replace("{CATEGORIES}", existing)
+            .replace("{FIELDS_CATALOG}", FieldTemplates.promptCatalog())
     }
 
     // ---------- разбор ответа ----------
@@ -130,6 +136,8 @@ class AgentAnalyzer(private val model: ChatModel) {
             links = links.distinctBy { it.url },
             confidence = confidence,
             source = AgentSource.AI,
+            // Если модель не разложила находку на поля — пробуем достать очевидное офлайн.
+            fields = parseFields(json, type).ifEmpty { FieldExtractor.extract(type, input.text) },
         )
     }
 
@@ -167,6 +175,7 @@ class AgentAnalyzer(private val model: ChatModel) {
             confidence = guess.confidence,
             source = AgentSource.LOCAL,
             warnings = warnings,
+            fields = FieldExtractor.extract(guess.type, input.text),
         )
     }
 
@@ -218,21 +227,94 @@ class AgentAnalyzer(private val model: ChatModel) {
             return runCatching { JSONObject(candidate.substring(start, end + 1)) }.getOrNull()
         }
 
+        /**
+         * Разбирает дополнительные поля из ответа модели. Поддерживаем несколько форм, потому что
+         * модели отвечают по-разному: массив объектов, объект-словарь, строка «Подпись: значение»,
+         * а иногда значения полей лежат прямо в корне ответа под нужными подписями.
+         */
+        fun parseFields(json: JSONObject, type: CategoryType): List<SecretField> {
+            val found = ArrayList<SecretField>()
+            val expected = FieldTemplates.labels(type)
+
+            json.optJSONArray("fields")?.let { array ->
+                for (i in 0 until array.length()) {
+                    when (val item = array.opt(i)) {
+                        is JSONObject -> {
+                            val label = item.optString("label").ifBlank { item.optString("name") }
+                            val value = item.optString("value").ifBlank { item.optString("val") }
+                            if (label.isNotBlank() && value.isNotBlank()) {
+                                found.add(SecretField(label.trim(), value.trim()))
+                            }
+                        }
+                        is String -> found.addAll(parseFieldLines(item))
+                    }
+                }
+            }
+            json.optJSONObject("fields")?.let { obj ->
+                obj.keys().forEach { key ->
+                    obj.optString(key).ifBlank { null }?.let { found.add(SecretField(key.trim(), it.trim())) }
+                }
+            }
+            (json.opt("fields") as? String)?.takeIf { it.isNotBlank() }?.let { found.addAll(parseFieldLines(it)) }
+
+            expected.forEach { label ->
+                val direct = json.optString(label)
+                if (direct.isNotBlank() && found.none { it.label.equals(label, ignoreCase = true) }) {
+                    found.add(SecretField(label, direct.trim()))
+                }
+            }
+
+            return alignToTemplate(
+                found.filter { it.value.isNotBlank() }.distinctBy { it.label.trim().lowercase() },
+                expected,
+            ).distinctBy { it.label.lowercase() }
+        }
+
+        private fun parseFieldLines(text: String): List<SecretField> =
+            text.lines().mapNotNull { line ->
+                val cut = line.indexOfFirst { it == ':' || it == '=' }
+                if (cut <= 0) null
+                else SecretField(
+                    line.substring(0, cut).trim().trim('"', '-', '*', ' ', '\u2022'),
+                    line.substring(cut + 1).trim().trim('"'),
+                )
+            }.filter { it.label.isNotBlank() && it.value.isNotBlank() }
+
+        /** Приводим подписи к шаблону: «CVV» и «Срок» модель могла написать короче. */
+        private fun alignToTemplate(fields: List<SecretField>, expected: List<String>): List<SecretField> =
+            fields.map { field ->
+                val canonical = expected.firstOrNull { it.equals(field.label, ignoreCase = true) }
+                    ?: expected.firstOrNull { candidate ->
+                        val short = field.label.trim().lowercase()
+                        val full = candidate.trim().lowercase()
+                        short.isNotBlank() && (full.contains(short) || short.contains(full.substringBefore('/').trim()))
+                    }
+                if (canonical != null) field.copy(label = canonical) else field
+            }
+
         private val PROMPT_TEMPLATE = """
             Ты — агент «Личного сейфа». Пользователь передал фрагмент из буфера обмена, файл или ссылку
             на изображение с секретом. Определи, что это за данные, к какому типу заметки они относятся,
-            и подготовь подробное описание.
+            разбери их на отдельные значения и подготовь подробное описание.
 
             Типы (поле type): TOKEN, PASSWORD, API_KEY, ID_CARD, BANK_CARD, PASSPORT, ACCOUNT, WIFI, PIN,
             LICENSE, CERTIFICATE, NOTE, OTHER.
 
             Уже существующие категории пользователя (формат id=название(тип)): {CATEGORIES}
 
+            Подписи дополнительных полей по типам — используй ИХ БУКВАЛЬНО:
+            {FIELDS_CATALOG}
+
             Правила:
             - Если данные подходят под существующую категорию — укажи её id в existing_category.
             - Если это известный бренд (Яндекс, Google, GitHub, банк и т.п.) — определи его, укажи brand_name
               и brand_domain (домен, например yandex.ru), а category_name сделай равным имени бренда (например «Яндекс»).
-            - value — сам секрет в чистом виде.
+            - value — главное значение секрета в чистом виде (номер карты, сам токен, пароль).
+            - fields — массив {"label":"...","value":"..."}: разложи находку на отдельные значения
+              (срок действия, CVV/CVC, PIN, держатель, банк; серия и номер паспорта, кем выдан, код
+              подразделения; SSID и пароль Wi-Fi; логин, пароль, e-mail). Бери подписи только из списка
+              для выбранного типа. Поля, значения которых в находке нет, НЕ добавляй. Не дублируй в fields
+              то, что уже отдал в value. Если разложить нечего — верни пустой массив.
             - description — короткое понятное название-подпись.
             - note — оставь пустым, это поле пользователя.
             - detailed_info — подробное описание: что это, кому принадлежит, для чего используется,
@@ -241,7 +323,7 @@ class AgentAnalyzer(private val model: ChatModel) {
             - confidence — от 0 до 1.
 
             Верни ТОЛЬКО JSON без пояснений:
-            {"type":"...","category_name":"...","existing_category":"","title":"...","value":"...","description":"...","note":"","brand_name":"","brand_domain":"","confidence":0.0,"detailed_info":"...","links":[]}
+            {"type":"...","category_name":"...","existing_category":"","title":"...","value":"...","description":"...","note":"","brand_name":"","brand_domain":"","confidence":0.0,"detailed_info":"...","links":[],"fields":[{"label":"...","value":"..."}]}
         """.trimIndent()
     }
 }

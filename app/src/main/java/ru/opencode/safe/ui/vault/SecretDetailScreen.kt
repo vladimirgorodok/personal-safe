@@ -62,7 +62,9 @@ import ru.opencode.safe.ui.components.DetailExpander
 import ru.opencode.safe.ui.components.GlassCard
 import ru.opencode.safe.ui.components.SafeTopBar
 import ru.opencode.safe.ui.components.SectionTitle
+import ru.opencode.safe.ui.components.SecretFieldRow
 import ru.opencode.safe.ui.components.SecretValueField
+import ru.opencode.safe.ui.components.copyableFieldsText
 import ru.opencode.safe.ui.components.TypeBadge
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -328,51 +330,6 @@ fun SecretDetailScreen(
     }
 }
 
-/** Одно дополнительное значение: подпись, скрытое значение и кнопка удаления. */
-@Composable
-private fun SecretFieldRow(
-    field: SecretField,
-    revealed: Boolean,
-    onRevealedChange: (Boolean) -> Unit,
-    onChange: (SecretField) -> Unit,
-    onRemove: () -> Unit,
-    onCopy: () -> Unit,
-) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = field.label,
-                onValueChange = { onChange(field.copy(label = it)) },
-                label = { Text("Название поля") },
-                placeholder = { Text("Например, «Код восстановления»") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                    focusedIndicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
-            )
-            Spacer(Modifier.width(6.dp))
-            IconButton(onClick = onRemove) {
-                Icon(Icons.Rounded.DeleteOutline, "Удалить поле", tint = MaterialTheme.colorScheme.error)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        SecretValueField(
-            value = field.value,
-            revealed = revealed,
-            onRevealedChange = onRevealedChange,
-            onChange = { onChange(field.copy(value = it)) },
-            onCopy = onCopy,
-            label = "Значение поля",
-            placeholder = "Введите секрет",
-        )
-    }
-}
-
 @Composable
 private fun CategoryPickerDialog(
     categories: List<Category>,
@@ -454,9 +411,3 @@ private fun LabeledField(
 
 private fun formatDate(millis: Long): String =
     SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(millis))
-
-/** Все заполненные дополнительные значения одной строкой: «Подпись: значение» через перевод строки. */
-private fun copyableFieldsText(fields: List<SecretField>): String =
-    fields
-        .filter { it.value.isNotBlank() }
-        .joinToString("\n") { "${it.label.ifBlank { "Значение" }}: ${it.value}" }

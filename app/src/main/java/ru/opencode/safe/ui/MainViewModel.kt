@@ -36,6 +36,7 @@ import ru.opencode.safe.data.model.CategoryType
 import ru.opencode.safe.data.model.Defaults
 import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
+import ru.opencode.safe.data.model.SecretField
 import ru.opencode.safe.data.model.SecretLink
 import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.data.model.VaultData
@@ -645,7 +646,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Сохраняет найденный секрет: в существующую или только что созданную категорию. */
-    fun saveAnalyzedResult(targetCategoryId: String?, newCategoryName: String? = null): Secret? {
+    fun saveAnalyzedResult(
+        targetCategoryId: String?,
+        newCategoryName: String? = null,
+        fields: List<SecretField>? = null,
+    ): Secret? {
         val result = _analyze.value.result ?: return null
         val category = when {
             targetCategoryId != null -> categoryOf(targetCategoryId)
@@ -678,7 +683,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             links = result.links,
             tags = result.brandName?.let { listOf(it) } ?: emptyList(),
             foundByAgent = result.source == AgentSource.AI,
-            fields = FieldTemplates.seed(result.type),
+            // Значения, проверенные на экране анализа; если их не передали — раскладываем из ответа агента.
+            fields = (fields ?: FieldTemplates.merge(result.type, result.fields))
+                .filter { it.label.isNotBlank() || it.value.isNotBlank() },
         )
         saveSecret(secret)
         _state.update { it.copy(toast = "Добавлено в «${category.name}»") }

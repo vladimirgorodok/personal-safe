@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhotoLibrary
@@ -43,6 +44,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,13 +65,18 @@ import ru.opencode.safe.data.ai.AgentSource
 import ru.opencode.safe.data.ai.AiProviders
 import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
+import ru.opencode.safe.data.model.FieldTemplates
+import ru.opencode.safe.data.model.SecretField
 import ru.opencode.safe.ui.AnalyzeState
 import ru.opencode.safe.ui.components.CategoryAvatar
 import ru.opencode.safe.ui.components.DetailExpander
 import ru.opencode.safe.ui.components.GlassCard
 import ru.opencode.safe.ui.components.ModelPickerDialog
 import ru.opencode.safe.ui.components.SafeTopBar
+import ru.opencode.safe.ui.components.SectionTitle
+import ru.opencode.safe.ui.components.SecretFieldRow
 import ru.opencode.safe.ui.components.TypeBadge
+import ru.opencode.safe.ui.components.copyableFieldsText
 
 @Composable
 fun AnalyzeScreen(
@@ -83,7 +90,7 @@ fun AnalyzeScreen(
     onClearAttachments: () -> Unit,
     onClear: () -> Unit,
     onRun: () -> Unit,
-    onSave: (categoryId: String?, newCategoryName: String?) -> Unit,
+    onSave: (categoryId: String?, newCategoryName: String?, fields: List<SecretField>) -> Unit,
     onOpenLink: (String) -> Unit,
     onCopy: (String) -> Unit,
     onOpenAiSettings: () -> Unit,
@@ -127,6 +134,11 @@ fun AnalyzeScreen(
     var title by remember(state.result) { mutableStateOf(state.result?.title.orEmpty()) }
     var description by remember(state.result) { mutableStateOf(state.result?.description.orEmpty()) }
     var note by remember(state.result) { mutableStateOf(state.result?.note.orEmpty()) }
+    // Типовые поля типа: значения агента подставлены, остальные подписи ждут заполнения.
+    var fields by remember(state.result) {
+        mutableStateOf(state.result?.let { FieldTemplates.merge(it.type, it.fields) }.orEmpty())
+    }
+    var revealedFields by remember(state.result) { mutableStateOf(emptySet<Int>()) }
 
     LaunchedEffect(autoPaste) {
         if (autoPaste && state.input.isBlank() && state.images.isEmpty() && state.imageUrl.isNullOrBlank()) {
@@ -343,6 +355,52 @@ fun AnalyzeScreen(
                     }
                 }
 
+                if (fields.isNotEmpty()) {
+                    item {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SectionTitle("Дополнительные значения", Modifier.weight(1f))
+                                if (fields.any { it.value.isNotBlank() }) {
+                                    TextButton(onClick = { onCopy(copyableFieldsText(fields)) }) {
+                                        Icon(Icons.Rounded.ContentCopy, null, Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Копировать всё")
+                                    }
+                                }
+                            }
+                            Text(
+                                "Агент разложил находку по полям. Заполните пустые, лишние удалите — значения " +
+                                    "скрыты глазом и копируются одной кнопкой.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            fields.forEachIndexed { index, field ->
+                                SecretFieldRow(
+                                    field = field,
+                                    revealed = index in revealedFields,
+                                    onRevealedChange = { open ->
+                                        revealedFields = if (open) revealedFields + index else revealedFields - index
+                                    },
+                                    onChange = { updated ->
+                                        fields = fields.toMutableList().also { it[index] = updated }
+                                    },
+                                    onRemove = {
+                                        fields = fields.toMutableList().also { it.removeAt(index) }
+                                        revealedFields = revealedFields
+                                            .filter { it != index }
+                                            .map { if (it > index) it - 1 else it }
+                                            .toSet()
+                                    },
+                                    onCopy = { onCopy(field.value) },
+                                    labelPlaceholder = "Название поля",
+                                )
+                                if (index != fields.lastIndex) Spacer(Modifier.height(14.dp))
+                            }
+                        }
+                    }
+                }
+
                 item {
                     Column {
                         Text("Категория", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -406,6 +464,7 @@ fun AnalyzeScreen(
                                 onSave(
                                     selectedCategory,
                                     if (selectedCategory == null) result.categoryName else null,
+                                    fields.filter { it.label.isNotBlank() || it.value.isNotBlank() },
                                 )
                             },
                             modifier = Modifier.weight(1f).height(52.dp),
