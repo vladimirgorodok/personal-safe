@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
+import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.data.model.SecretField
 import ru.opencode.safe.data.model.SecretLink
@@ -64,6 +68,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SecretDetailScreen(
     secret: Secret,
@@ -192,7 +197,18 @@ fun SecretDetailScreen(
             item { LabeledField("Описание", description, { description = it }, onCopy = { onCopy(description) }) }
             item { LabeledField("Примечание", note, { note = it }, minLines = 3, onCopy = { onCopy(note) }) }
 
-            item { SectionTitle("Дополнительные значения", Modifier.padding(top = 6.dp)) }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionTitle("Дополнительные значения", Modifier.weight(1f).padding(top = 6.dp))
+                    if (fields.any { it.value.isNotBlank() }) {
+                        TextButton(onClick = { onCopy(copyableFieldsText(fields)) }) {
+                            Icon(Icons.Rounded.ContentCopy, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Копировать всё")
+                        }
+                    }
+                }
+            }
             if (fields.isEmpty()) {
                 item {
                     Text(
@@ -223,6 +239,37 @@ fun SecretDetailScreen(
                         },
                         onCopy = { onCopy(field.value) },
                     )
+                }
+            }
+            val suggestedLabels = FieldTemplates.suggested(type, fields)
+            if (suggestedLabels.isNotEmpty()) {
+                item {
+                    Column {
+                        Text(
+                            "Типовые поля для «${type.label}» — нажмите, чтобы добавить:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            suggestedLabels.forEach { label ->
+                                SuggestionChip(
+                                    onClick = { fields = fields + SecretField(label = label) },
+                                    label = { Text(label) },
+                                    icon = { Icon(Icons.Rounded.Add, null, Modifier.size(16.dp)) },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Значение каждого поля скрыто глазом и копируется одной кнопкой.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             item {
@@ -407,3 +454,9 @@ private fun LabeledField(
 
 private fun formatDate(millis: Long): String =
     SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(millis))
+
+/** Все заполненные дополнительные значения одной строкой: «Подпись: значение» через перевод строки. */
+private fun copyableFieldsText(fields: List<SecretField>): String =
+    fields
+        .filter { it.value.isNotBlank() }
+        .joinToString("\n") { "${it.label.ifBlank { "Значение" }}: ${it.value}" }

@@ -55,6 +55,7 @@ import ru.opencode.safe.data.ai.BrandGroup
 import ru.opencode.safe.data.ai.BrandGrouper
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.Defaults
+import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.data.model.UserProfile
 import ru.opencode.safe.ui.components.BrandAvatar
@@ -359,6 +360,14 @@ private fun SecretRow(secret: Secret, category: Category?, onClick: () -> Unit, 
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                FieldTemplates.filledSummary(secret.fields)?.let { hint ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        hint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             IconButton(onClick = onToggleFavorite) {
                 Icon(

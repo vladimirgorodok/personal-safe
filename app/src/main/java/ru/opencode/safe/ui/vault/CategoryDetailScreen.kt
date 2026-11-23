@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.model.Category
+import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.ui.components.Appear
 import ru.opencode.safe.ui.components.CategoryAvatar
@@ -132,8 +133,14 @@ fun CategoryDetailScreen(
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(secret.title.ifBlank { "Без названия" }, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Spacer(Modifier.height(2.dp))
+                                    Spacer(Modifier.height(4.dp))
+                                    TypeBadge(secret.type)
+                                    Spacer(Modifier.height(4.dp))
                                     Text(mask(secret.value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    FieldTemplates.filledSummary(secret.fields)?.let { hint ->
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                                 IconButton(onClick = { onToggleFavorite(secret.id) }) {
                                     Icon(

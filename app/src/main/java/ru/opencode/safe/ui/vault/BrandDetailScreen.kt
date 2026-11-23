@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.Defaults
+import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.ui.components.BrandAvatar
 import ru.opencode.safe.ui.components.Appear
@@ -151,6 +152,10 @@ fun BrandDetailScreen(
                                     }
                                     Spacer(Modifier.height(4.dp))
                                     Text(mask(secret.value), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    FieldTemplates.filledSummary(secret.fields)?.let { hint ->
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                                 IconButton(onClick = { onToggleFavorite(secret.id) }) {
                                     Icon(

@@ -34,6 +34,7 @@ import ru.opencode.safe.data.model.AiConfig
 import ru.opencode.safe.data.model.Category
 import ru.opencode.safe.data.model.CategoryType
 import ru.opencode.safe.data.model.Defaults
+import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.data.model.SecretLink
 import ru.opencode.safe.data.model.UserProfile
@@ -417,12 +418,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun createEmptySecret(categoryId: String): Secret {
         val category = categoryOf(categoryId)
+        val type = category?.type ?: CategoryType.OTHER
         val secret = Secret(
             categoryId = categoryId,
-            type = category?.type ?: CategoryType.OTHER,
+            type = type,
             title = "",
             value = "",
             description = "",
+            // Типовые поля типа (у карты — срок, CVV, PIN): их сразу можно заполнить и копировать.
+            fields = FieldTemplates.seed(type),
         )
         saveSecret(secret)
         return secret
@@ -674,6 +678,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             links = result.links,
             tags = result.brandName?.let { listOf(it) } ?: emptyList(),
             foundByAgent = result.source == AgentSource.AI,
+            fields = FieldTemplates.seed(result.type),
         )
         saveSecret(secret)
         _state.update { it.copy(toast = "Добавлено в «${category.name}»") }
