@@ -19,6 +19,9 @@ class VaultStore(
         return runCatching { VaultData.fromJson(JSONObject(text)) }.getOrElse { VaultData() }
     }
 
+    /** Создавался ли сейф на этом устройстве хоть раз: отличает чистую установку от пустого сейфа. */
+    fun exists(): Boolean = file.exists()
+
     fun save(data: VaultData) {
         crypto.writeText(file, data.toJson().toString())
     }

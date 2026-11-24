@@ -94,6 +94,10 @@ data class BackupState(
     val error: String? = null,
     val hasRemote: Boolean = false,
     val remoteModified: String? = null,
+    /** Сколько секретов в копии на Google Drive (null — копии нет или она не читается). */
+    val remoteSecrets: Int? = null,
+    /** Копия полнее локальных данных — предлагаем загрузить её одной кнопкой. */
+    val offerRestore: Boolean = false,
     /** Доступ к Drive получен — автоматическая копия после изменений работает. */
     val autoActive: Boolean = false,
     /** Время последней автоматической копии. */
@@ -131,6 +135,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** Пробовали ли уже получить доступ к Drive без окон. */
     private var drivePrimed = false
 
+    /** На этом устройстве сейфа ещё не было: чистая установка (можно поднять копию молча). */
+    private var freshInstall = false
+
     private var autoBackupJob: Job? = null
 
     private val brandIconRequests = mutableSetOf<String>()
@@ -147,11 +154,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun loadVault() {
         viewModelScope.launch(Dispatchers.IO) {
+            // Смотрим до первого сохранения: иначе сейф создастся и «чистую установку» уже не отличить.
+            val hadVault = container.vault.exists()
             val loaded = container.vault.load()
             val seeded = if (loaded.categories.isEmpty()) {
                 loaded.copy(categories = Defaults.defaultCategories())
             } else loaded
             withContext(Dispatchers.Main) {
+                freshInstall = !hadVault
                 data = seeded
                 if (loaded.categories.isEmpty()) persist()
                 publish()
@@ -211,6 +221,79 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val token = driveToken()
             _backup.update { it.copy(autoActive = token != null) }
+            if (token != null) checkRemoteAtStart(token)
+        }
+    }
+
+    /**
+     * Проверяет копию в Drive при запуске. На чистой установке (локальный сейф ещё не создавался)
+     * сразу поднимает её — именно этого не хватало: копия сохранялась, но сама не загружалась.
+     * Если локальные данные уже есть, а копия полнее, тихо ничего не меняем, а показываем
+     * карточку «Загрузить» — пользователь мог удалить записи намеренно.
+     */
+    private suspend fun checkRemoteAtStart(token: String) {
+        val remote = runCatching { drive.findBackup(token) }.getOrNull() ?: return
+        val blob = runCatching { drive.download(token, remote.id) }.getOrNull() ?: return
+        // Копия старого формата: её не расшифровать без фразы, разбирается на экране резервной копии.
+        if (BackupCrypto.isPassphraseBackup(blob)) {
+            _backup.update {
+                it.copy(hasRemote = true, remoteModified = remote.modifiedTime, remoteSecrets = null)
+            }
+            return
+        }
+        val restored = runCatching {
+            val json = String(BackupCrypto.decryptWithKey(blob, driveKey(token)), Charsets.UTF_8)
+            VaultData.fromJson(JSONObject(json))
+        }.getOrNull() ?: return
+
+        val localSecrets = data.secrets.size
+        val remoteSecrets = restored.secrets.size
+        _backup.update {
+            it.copy(hasRemote = true, remoteModified = remote.modifiedTime, remoteSecrets = remoteSecrets)
+        }
+
+        when (BackupSafety.startupAction(freshInstall, localSecrets, remoteSecrets)) {
+            BackupSafety.StartupAction.RESTORE ->
+                applyRestore(restored, remote.modifiedTime, toast = "Загружено из Google Drive: $remoteSecrets секретов")
+            BackupSafety.StartupAction.OFFER ->
+                _backup.update { it.copy(offerRestore = true) }
+            BackupSafety.StartupAction.NONE -> Unit
+        }
+    }
+
+    /** Загружает предложенную копию — кнопка на карточке в сейфе. */
+    fun restoreOfferedBackup() {
+        viewModelScope.launch {
+            val token = driveToken()
+            if (token == null) {
+                _backup.update {
+                    it.copy(offerRestore = false, error = "Нет доступа к Google Drive: войдите в аккаунт заново")
+                }
+                return@launch
+            }
+            restoreBackup(token)
+        }
+    }
+
+    /** Убирает карточку «есть копия полнее» до следующего запуска. */
+    fun dismissRestoreOffer() = _backup.update { it.copy(offerRestore = false) }
+
+    /** Общий путь восстановления: заменить локальные данные копией и записать их на диск. */
+    private fun applyRestore(restored: VaultData, modifiedTime: String?, toast: String?) {
+        data = restored
+        guardChecked = true
+        persist()
+        publish()
+        restored.categories.forEach { ensureIconFor(it.id) }
+        if (toast != null) _state.update { it.copy(toast = toast) }
+        _backup.update {
+            it.copy(
+                hasRemote = true,
+                remoteModified = modifiedTime,
+                remoteSecrets = restored.secrets.size,
+                offerRestore = false,
+                phraseRequired = false,
+            )
         }
     }
 
@@ -905,18 +988,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             result
                 .onSuccess { (restored, file) ->
-                    data = restored
-                    guardChecked = true
-                    persist()
-                    publish()
-                    restored.categories.forEach { ensureIconFor(it.id) }
+                    applyRestore(restored, file.modifiedTime, toast = null)
                     _backup.update {
                         it.copy(
                             running = false,
-                            hasRemote = true,
-                            remoteModified = file.modifiedTime,
-                            phraseRequired = false,
-                            error = null,
                             message = "Данные восстановлены: ${restored.secrets.size} секретов · ${restored.categories.size} категорий",
                         )
                     }

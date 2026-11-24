@@ -235,6 +235,9 @@ private fun ReadyContent(
                 onCreateCategory = { nav.push(Screen.CategoryEdit(null)) },
                 onToggleFavorite = viewModel::toggleFavorite,
                 onEnsureBrandIcon = viewModel::ensureBrandIcon,
+                backup = backupState,
+                onRestoreFromCloud = viewModel::restoreOfferedBackup,
+                onDismissRestoreOffer = viewModel::dismissRestoreOffer,
             )
 
             Screen.Analyze -> AnalyzeScreen(

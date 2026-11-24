@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.ImageSearch
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -28,7 +29,9 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +62,7 @@ import ru.opencode.safe.data.model.Defaults
 import ru.opencode.safe.data.model.FieldTemplates
 import ru.opencode.safe.data.model.Secret
 import ru.opencode.safe.data.model.UserProfile
+import ru.opencode.safe.ui.BackupState
 import ru.opencode.safe.ui.components.BrandAvatar
 import ru.opencode.safe.ui.components.Appear
 import ru.opencode.safe.ui.components.CategoryAvatar
@@ -83,6 +88,9 @@ fun VaultScreen(
     onCreateCategory: () -> Unit,
     onToggleFavorite: (String) -> Unit,
     onEnsureBrandIcon: (String, String) -> Unit,
+    backup: BackupState,
+    onRestoreFromCloud: () -> Unit,
+    onDismissRestoreOffer: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var brandMode by remember { mutableStateOf(false) }
@@ -143,6 +151,18 @@ fun VaultScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { Header(profile, secrets.size, categories.size, onOpenSettings, onOpenImageSearch) }
+            if (backup.offerRestore) {
+                item {
+                    RestoreOfferCard(
+                        remoteSecrets = backup.remoteSecrets,
+                        modified = backup.remoteModified,
+                        running = backup.running,
+                        error = backup.error,
+                        onRestore = onRestoreFromCloud,
+                        onDismiss = onDismissRestoreOffer,
+                    )
+                }
+            }
             item { SearchBar(query) { query = it } }
 
             item {
@@ -238,6 +258,62 @@ fun VaultScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RestoreOfferCard(
+    remoteSecrets: Int?,
+    modified: String?,
+    running: Boolean,
+    error: String?,
+    onRestore: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Rounded.CloudDownload,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "В Google Drive копия полнее",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                buildString {
+                    append("В облаке ")
+                    append(remoteSecrets?.let { "$it секретов" } ?: "резервная копия")
+                    modified?.take(16)?.let { append(" · ${it.replace('T', ' ')}") }
+                    append(". Загрузить её в сейф на этом устройстве?")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (error != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilledTonalButton(onClick = onRestore, enabled = !running) {
+                    if (running) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text("Загрузить")
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onDismiss) { Text("Позже") }
             }
         }
     }
